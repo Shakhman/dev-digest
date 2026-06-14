@@ -1,7 +1,15 @@
 import type { Container } from '../../platform/container.js';
-import type { Agent, AgentSkillLink, CiFailOn, ModelInfo, Provider, ReviewStrategy } from '@devdigest/shared';
+import type {
+  Agent,
+  AgentSkillLink,
+  AgentVersion,
+  CiFailOn,
+  ModelInfo,
+  Provider,
+  ReviewStrategy,
+} from '@devdigest/shared';
 import { AgentsRepository } from './repository.js';
-import { toAgentDto } from './helpers.js';
+import { toAgentDto, toAgentVersionDto } from './helpers.js';
 
 /**
  * A2 — agents service. Business logic for the Agents tab + Agent Editor.
@@ -98,6 +106,33 @@ export class AgentsService {
       ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
     });
     return row ? toAgentDto(row) : undefined;
+  }
+
+  /**
+   * Config history for an agent, newest version first. Workspace-scoped: returns
+   * undefined when the agent isn't in this workspace (the route maps that to 404)
+   * so version snapshots can't be read across tenants.
+   */
+  async listVersions(workspaceId: string, agentId: string): Promise<AgentVersion[] | undefined> {
+    const agent = await this.repo.getById(workspaceId, agentId);
+    if (!agent) return undefined;
+    const rows = await this.repo.listVersions(agentId);
+    return rows.map(toAgentVersionDto);
+  }
+
+  /**
+   * A single config snapshot for an agent. Returns undefined when the agent isn't
+   * in this workspace OR that version was never recorded (route → 404).
+   */
+  async getVersion(
+    workspaceId: string,
+    agentId: string,
+    version: number,
+  ): Promise<AgentVersion | undefined> {
+    const agent = await this.repo.getById(workspaceId, agentId);
+    if (!agent) return undefined;
+    const row = await this.repo.getVersion(agentId, version);
+    return row ? toAgentVersionDto(row) : undefined;
   }
 
   /** Linked skills for an agent as AgentSkillLink[] (ordered). */

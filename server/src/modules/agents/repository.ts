@@ -1,4 +1,4 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import type { CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
@@ -11,8 +11,8 @@ import { isConfigChange } from './helpers.js';
  * agent side: link/reorder/list for an agent). Workspace-scoped throughout.
  */
 
-import type { AgentRow } from '../../db/rows.js';
-export type { AgentRow };
+import type { AgentRow, AgentVersionRow } from '../../db/rows.js';
+export type { AgentRow, AgentVersionRow };
 
 export interface InsertAgent {
   workspaceId: string;
@@ -164,6 +164,26 @@ export class AgentsRepository {
         },
       })
       .onConflictDoNothing();
+  }
+
+  // ---- agent_versions (immutable config snapshots) ------------------------
+
+  /** All config snapshots for an agent, newest version first. */
+  async listVersions(agentId: string): Promise<AgentVersionRow[]> {
+    return this.db
+      .select()
+      .from(t.agentVersions)
+      .where(eq(t.agentVersions.agentId, agentId))
+      .orderBy(desc(t.agentVersions.version));
+  }
+
+  /** A single config snapshot, or undefined if that version was never recorded. */
+  async getVersion(agentId: string, version: number): Promise<AgentVersionRow | undefined> {
+    const [row] = await this.db
+      .select()
+      .from(t.agentVersions)
+      .where(and(eq(t.agentVersions.agentId, agentId), eq(t.agentVersions.version, version)));
+    return row;
   }
 
   // ---- agent_skills link table (A2 owns the agent side) -------------------
