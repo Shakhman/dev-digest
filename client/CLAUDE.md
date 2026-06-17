@@ -39,4 +39,4 @@ messages/<locale>/    — i18n strings (never hardcode strings in components)
 README.md — full route map diagram
 docs/     — UI architecture decisions (create when needed)
 specs/    — feature specs (create when needed)
-INSIGHTS.md — component gotchas and patterns (create when needed)
+INSIGHTS.md — session wrap-ups and gotchas (append-only, see insights skill)
