@@ -1,38 +1,29 @@
-# DevDigest
+# DevDigest — agent guide
 
-**Use when:** any task in this repo — start here for the map, then open the
-package CLAUDE.md that matches what you're touching.
+Local-first AI PR reviewer. Course starter: Part-0 works end to end; each lesson adds one feature.
 
-Local-first AI PR review. 4 standalone packages — no monorepo workspace,
-cross-package code shared via **tsconfig path aliases** (not published modules).
+## Before answering
+Always search the relevant package's `docs/`, `specs/`, and `INSIGHTS.md` for what the
+user asks about FIRST — these are curated and may already answer it — then read code.
 
-| Package                  | What                                | Port |
-|--------------------------|-------------------------------------|------|
-| server/                  | Fastify 5 API + Drizzle + Postgres  | 3001 |
-| client/                  | Next.js 15 studio                   | 3000 |
-| reviewer-core/           | diff → prompt → LLM → findings      | —    |
-| e2e/                     | agent-browser deterministic flows   | —    |
-| server/src/vendor/shared | @devdigest/shared Zod contracts     | —    |
+## Session protocol (engineering-insights loop)
+- **Start:** before touching a package, read its `INSIGHTS.md` and summarize the top 3
+  relevant points back — this forces an active read and catches a silently-failed load.
+- **Before recording an insight:** re-read that package's `INSIGHTS.md` and do not duplicate
+  what's already there.
+- **End of session:** run `/engineering-insights`. Record only substantial, file-grounded,
+  non-duplicate findings; if nothing substantial came up, write nothing — but don't skip the
+  check. Writes are strictly append-only (never overwrite an `INSIGHTS.md`).
 
-## Quick start
-```sh
-./scripts/dev.sh   # Docker Postgres + API :3001 + web :3000
-```
+## Conventions (not obvious from code)
+- NOT a monorepo workspace — each package has its own package.json/lockfile; cross-package code is shared via tsconfig path aliases.
+- Modules are registered statically in `server/src/modules/index.ts` (no filesystem autoload).
+- ESM: relative imports carry the `.js` extension.
 
-## Non-default conventions
-- Migrations NOT auto-run on boot — `cd server && pnpm db:migrate`
-- `*.it.test.ts` = DB-backed (testcontainers Postgres); everything else hermetic
-- Secrets in `~/.devdigest/secrets.json` (mode 0600) — never in .env, DB, or git
-- Each package has its own lockfile and `node_modules`
+## Do-not-touch
+- `server/src/vendor/shared/` and `server/src/db/migrations/` — never hand-edit without coordination.
 
-## Do NOT touch
-- `server/src/vendor/shared` — shared contracts; edits break client + reviewer-core
-- `server/src/db/schema` — all lesson tables pre-created; empty ones are intentional
-- `**/pnpm-lock.yaml`, `**/package-lock.json` — each package owns its own lockfile; never edit manually
-
-## Package maps
-server/CLAUDE.md · client/CLAUDE.md · reviewer-core/CLAUDE.md · e2e/CLAUDE.md
-
-## Full docs
-README.md · TESTING.md · server/README.md · client/README.md ·
-reviewer-core/README.md · e2e/README.md
+## Use when
+- Stack, commands, architecture, how to run → read `README.md`
+- Working inside a package → read that package's CLAUDE.md: `server/CLAUDE.md`, `client/CLAUDE.md`, `reviewer-core/CLAUDE.md`, `e2e/CLAUDE.md`
+- Agent prompt templates → read `docs/agent-prompts/`

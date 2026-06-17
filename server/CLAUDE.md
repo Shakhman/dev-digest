@@ -1,38 +1,16 @@
-# @devdigest/api — Fastify API
+# server (@devdigest/api)
 
-**Use when:** touching API routes, DB schema/migrations, review execution, agents,
-repo indexing, polling, secrets, or anything under `server/`.
+## Before answering
+Search `server/docs/`, `server/specs/`, `server/INSIGHTS.md` for the topic before reading code.
 
-Stack: Fastify 5 · Drizzle ORM · Postgres + pgvector · Zod via fastify-type-provider-zod
+## Conventions (not obvious from code)
+- Multi-tenancy: every domain table has `workspace_id`; queries are scoped by the base-repository guard.
+- DI via `src/platform/container.ts`: services depend on interfaces (`@devdigest/shared`), not classes; tests inject mocks via `ContainerOverrides`.
+- repo-intel is reached ONLY through the facade `container.repoIntel.*` — never touch the pipeline directly.
+- Context enrichment is best-effort: on error/unindexed, omit the section, don't throw.
+- New feature = new module + one line in `src/modules/index.ts`; new columns = your own migration only.
 
-## Commands
-```sh
-pnpm dev                                              # :3001
-pnpm test                                             # unit + integration
-pnpm exec vitest run --exclude '**/*.it.test.ts'     # unit only (hermetic)
-pnpm exec vitest run .it.test                        # integration only (needs Docker)
-```
-
-## Module map (src/modules/)
-repos · pulls · reviews · agents · polling · settings · workspace · repo-intel
-
-## Non-default
-- Route schemas (params/body) declared via Zod — handlers never call Schema.parse()
-- Secrets via `LocalSecretsProvider` (`src/adapters/secrets/local.ts`);
-  GITHUB_PAT accepted as fallback for GITHUB_TOKEN
-- Rate limit: 120/min global; tighter on `POST /pulls/:id/review`; off in test
-- Review runs fire-and-forget; orphaned `running` runs reaped on startup
-
-## Gotchas
-- REPO_INTEL_ENABLED defaults true — unindexed repo silently degrades to diff-only
-- Model's self-reported score is IGNORED; recomputed from grounded findings only
-
-## Do NOT touch
-- `src/vendor/shared` — shared with client + reviewer-core via tsconfig alias
-- `src/db/schema` — tables for all course lessons pre-created; empty = intentional
-
-## Further
-README.md — full request/DI flow + API map diagram
-docs/     — architecture decisions (create when needed)
-specs/    — feature specs and API contracts (create when needed)
-INSIGHTS.md — session wrap-ups and gotchas (append-only, see insights skill)
+## Use when
+- Overview, commands, route/API map → read `server/README.md`
+- Indexer internals → read `server/src/modules/repo-intel/README.md`
+- Deep-dives → read `server/docs/` · feature specs/acceptance → read `server/specs/` · gotchas/findings → read `server/INSIGHTS.md`

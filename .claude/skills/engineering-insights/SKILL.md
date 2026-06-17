@@ -1,79 +1,98 @@
 ---
 name: engineering-insights
-description: "Read the relevant module's INSIGHTS.md at the START of a session, and capture substantial new learnings to it at the END. Read when a user prompt or your clarifying question names a module to develop or discuss. Write at wrap-up only when something substantial and not-already-recorded came up. Trigger terms: wrap-up, session summary, document what we learned, capture insights, /insights, engineering-insights."
-metadata:
-  tags: insights, knowledge, wrap-up, session-notes, learnings
+description: Captures non-obvious engineering insights into the touched module's INSIGHTS.md (client, server, reviewer-core, e2e). Use during a session the moment you hit something a future agent would otherwise relearn — a gotcha, a working approach, a dead-end antipattern, a codebase convention, a tool/library quirk, a recurring error+fix, or an open question — and again at session end, on "wrap up" / "retro", or when /engineering-insights is invoked. Reads the existing file first, never duplicates, writes only substantial file-grounded entries, and is strictly append-only (never overwrites).
 ---
 
-## Read first (start of session)
+# Engineering Insights
 
-Once the user has entered their input/prompt, or you've asked a clarifying
-question, **read the INSIGHTS.md of the module that's about to be developed or
-discussed — before doing the work.** Don't wait for wrap-up.
+Capture one durable engineering insight into the **INSIGHTS.md of the module the work
+touched**, so the next session doesn't relearn it. Read what's already there, add only
+what's new and substantial, never overwrite.
 
-1. From the prompt (or your question), determine the target module:
-   `server/` · `client/` · `reviewer-core/` · `e2e/`
-2. Read that module's `INSIGHTS.md` and let its entries inform your approach
-3. If multiple modules are in scope, read each one's `INSIGHTS.md`
+## Where to write (module routing)
 
-## Write last (end of session) — only if substantial
+Write to the file of the package the work actually touched:
 
-1. Identify which module was touched: `server/` · `client/` · `reviewer-core/` · `e2e/`
-2. **Reread that module's `INSIGHTS.md` before writing anything** — if the
-   insight is already recorded (in any form), do NOT duplicate it
-3. **Only record something substantial** — a real problem/solution/discovery
-   that wasn't already written. If nothing new and substantial came up during
-   the session, write **nothing**
-4. Append to that module's `INSIGHTS.md` — **never overwrite existing entries**
-5. Add a dated `## Session Notes` entry plus any relevant section entries below
-6. Every entry must be **actionable cold**: a future agent reads it and knows exactly what to do — no vague warnings
-7. Skip trivial config changes or anything obvious from reading the code
+| Work touched | File |
+|---|---|
+| client (`@devdigest/web`) | `client/INSIGHTS.md` |
+| server (`@devdigest/api`, incl. repo-intel) | `server/INSIGHTS.md` |
+| reviewer-core (`@devdigest/reviewer-core`) | `reviewer-core/INSIGHTS.md` |
+| e2e (`@devdigest/e2e`) | `e2e/INSIGHTS.md` |
+| spans several packages | write the part relevant to each, to each file |
+| pure root config / CI only | usually not a module insight — skip it |
 
-**Quality test:** "Would this be obvious to anyone reading the code?" → if yes, don't write it.
-**Dedup test:** "Is this already in INSIGHTS.md?" → if yes, don't write it.
-**Substance test:** "Did anything new and substantial actually happen?" → if no, write nothing.
+Never write insights into this SKILL.md itself.
 
-**BAD:** `"be careful with async"` · `"Promises can be tricky"`  
-**GOOD:** `"groundFindings() drops a finding silently if end_line < start_line — always sort range before passing"`
+## What counts (the 7 sections)
 
-## INSIGHTS.md structure (fixed sections, append-only)
+Each `INSIGHTS.md` has fixed sections — append each entry under the right one:
 
-```md
-## What Works
-<!-- Approaches and solutions that worked; include the why -->
+- **What Works** — an approach/solution that worked here.
+- **What Doesn't Work** — dead ends and antipatterns. **Highest-value section, most often skipped — prioritize it.**
+- **Codebase Patterns** — conventions and architectural decisions.
+- **Tool & Library Notes** — dependency quirks and gotchas.
+- **Recurring Errors & Fixes** — an error you'd hit again + the fix.
+- **Session Notes** — dated session summaries (use a `### YYYY-MM-DD` subheading).
+- **Open Questions** — what's still unresolved.
 
-## What Doesn't Work
-<!-- Dead ends and anti-patterns — the most valuable section; most often skipped -->
+## Concrete, not banal
 
-## Codebase Patterns
-<!-- Conventions and architectural decisions non-obvious from the code -->
+Test before writing: **"If this were obvious to anyone reading the code, don't write it."**
 
-## Tool & Library Notes
-<!-- Dependency quirks specific to this module -->
+| ❌ Noise | ✅ Useful (actionable cold) |
+|---|---|
+| "Promises can be tricky" | "`Promise.all()` on the ingest pipeline times out after 30 items — use `Promise.allSettled()` in batches of 10" |
+| "be careful with context enrichment" | "context enrichment is best-effort: on unindexed/error, omit the section, never throw — `server/...:NN`" |
 
-## Recurring Errors & Fixes
-<!-- Error message → root cause → fix; one entry per error -->
+## Entry format
 
-## Session Notes
-<!-- Dated summaries: ### YYYY-MM-DD\n bullet points of what happened -->
+Append a bullet under the matching `##` section:
 
-## Open Questions
-<!-- Unresolved; remove when answered -->
+```
+- **YYYY-MM-DD** — <concrete, actionable insight>. Evidence: `path/file.ts:NN`.
 ```
 
-## When to use
+Session Notes instead group under a dated subheading:
 
-- **Start of session** (read): once the prompt/your question names a module to
-  develop or discuss — read that module's `INSIGHTS.md` before doing the work
-- **End of session** (write): after any session >30 min with a problem,
-  solution, or discovery — but only if it's substantial and not already recorded
-- **Capture as you go**: immediately when something non-obvious happens mid-task
-- Skip: trivial config edits, straightforward CRUD changes, anything already in `INSIGHTS.md`
+```
+### YYYY-MM-DD
+- <what the session accomplished / decided, one line per point>
+```
 
-## Maintenance rules
+## Workflow
 
-- **append-only** — add entries, never rewrite existing ones (merge conflicts lose lessons)
-- **Clean monthly** — updated library → old quirk notes become noise or harmful advice
-- **Don't let it bloat** — >200 entries: split into `INSIGHTS-<domain>.md`
-- **Resolve contradictions** — one section says "always do X", another "X fails here" → fix explicitly
-- **INSIGHTS.md is a draft** — LLM wrap-up does 90% of work but may summarize wrong; spot-check
+Copy this checklist and work through it:
+
+```
+- [ ] 1. Gate check — was this session substantial?
+- [ ] 2. Read the touched module's INSIGHTS.md
+- [ ] 3. Draft ≤5 candidates, ranked by signal
+- [ ] 4. Dedup against what's already there
+- [ ] 5. Append automatically (append-only)
+- [ ] 6. One-line summary
+```
+
+1. **Gate check.** Did the session produce something substantial — a problem solved, a decision made, a non-obvious discovery? If not → **write nothing** and stop.
+2. **Read first.** Open the touched module's `INSIGHTS.md` before drafting anything.
+3. **Draft ≤5 candidates**, ranked by signal (user corrections and gotchas highest; nice-to-know patterns lowest). Each candidate = the exact proposed line + its target section + `file:line` evidence.
+4. **Dedup.** Drop any candidate already covered by an existing entry. If reality contradicts an old entry, add a new dated note that supersedes it — never edit the old one.
+5. **Append** the survivors (automatic mode — no approval prompt). If nothing substantial survives gate + dedup, write nothing.
+6. **Summary.** One line: what was written, to which file, what was skipped.
+
+## Non-destructive write contract (hard rule)
+
+This skill is **append-only** and must never clobber existing content:
+
+- **Re-read the target `INSIGHTS.md` immediately before writing** — its state may have changed since the session started.
+- **Insert with an anchored `Edit`** that adds the new bullet under the correct `##` heading. **Never use the `Write` tool on an existing `INSIGHTS.md`** — `Write` replaces the whole file and would destroy prior content.
+- **Preserve verbatim** the `# Insights — …` header, the preamble, every section heading, and every entry already in the file. New content is only ever *added*.
+- **Corrections are additive** — supersede a wrong entry with a new dated note; do not rewrite or delete the old one.
+- **Idempotent** — if an equivalent entry already exists, skip it (no duplicate, no rewrite).
+
+## Maintenance (not per-session)
+
+Append-only keeps the file growing, so keep it lean out of band: prune monthly (drop
+fixed-bug, duplicate, and never-needed entries), aim for ~30 high-value entries per file
+before splitting into domain files, and treat the file as a reviewed draft — spot-check it,
+since an incorrect entry propagates to every future session until corrected.
