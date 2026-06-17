@@ -53,10 +53,13 @@ export function SeverityBadge({
   severity,
   count,
   compact,
+  plain,
 }: {
   severity: Severity;
   count?: number;
   compact?: boolean;
+  /** Strip background and border-radius — just icon + count in the severity color. */
+  plain?: boolean;
 }) {
   const s = SEV[severity];
   const I = Icon[s.icon];
@@ -67,11 +70,11 @@ export function SeverityBadge({
         alignItems: "center",
         gap: 6,
         padding: compact ? "2px 6px" : "3px 9px",
-        borderRadius: 5,
+        borderRadius: plain ? undefined : 5,
         fontSize: 12,
         fontWeight: 600,
         color: s.c,
-        background: s.bg,
+        background: plain ? undefined : s.bg,
         textTransform: "uppercase",
         letterSpacing: "0.04em",
       }}

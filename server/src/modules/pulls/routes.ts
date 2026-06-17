@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNull } from 'drizzle-orm';
 import type { PrMeta, PrDetail, GitHubClient, PrReviewComment } from '@devdigest/shared';
 import { PrCommentInput } from '@devdigest/shared';
 import * as t from '../../db/schema.js';
@@ -111,23 +111,75 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       }
     }
 
-    // Latest-review SCORE per PR for the list's score ring. Computed on read
-    // from reviews (no FK denorm); the list is small, so one IN-query + JS
-    // grouping is cheap. (The per-severity FINDINGS breakdown is intentionally
-    // not surfaced on the list — findings live on the PR detail page.)
+    // Latest-review SCORE, COST, and per-severity open-finding counts per PR.
+    // A single query fetches all reviews newest-first; the first row per PR
+    // supplies the score/cost ring, and the "last run" logic (all reviews within
+    // a 2-minute session window of the newest) supplies the findings column.
+    // Multi-agent runs fire in parallel and typically complete within seconds of
+    // each other, so 2 minutes safely captures the whole session.
     const prIds = rows.map((r) => r.id);
     const latestReviewByPr = new Map<string, { score: number | null; cost_usd: number | null }>();
+    const findingsBySeverityByPr = new Map<string, { critical: number; warning: number; suggestion: number }>();
     if (prIds.length > 0) {
       const reviewRows = await container.db
-        .select({ prId: t.reviews.prId, score: t.reviews.score, costUsd: t.agentRuns.costUsd })
+        .select({
+          reviewId: t.reviews.id,
+          prId: t.reviews.prId,
+          score: t.reviews.score,
+          createdAt: t.reviews.createdAt,
+          costUsd: t.agentRuns.costUsd,
+        })
         .from(t.reviews)
         .leftJoin(t.agentRuns, eq(t.agentRuns.id, t.reviews.runId))
         .where(and(inArray(t.reviews.prId, prIds), eq(t.reviews.kind, 'review')))
         .orderBy(desc(t.reviews.createdAt));
-      // Rows are newest-first → first seen per PR is the latest review.
+
+      // Group by PR (rows are newest-first). First row = latest review for score/cost.
+      const prReviews = new Map<string, { reviewId: string; createdAt: Date }[]>();
       for (const rv of reviewRows) {
         if (!latestReviewByPr.has(rv.prId))
           latestReviewByPr.set(rv.prId, { score: rv.score, cost_usd: rv.costUsd ?? null });
+        if (!prReviews.has(rv.prId)) prReviews.set(rv.prId, []);
+        prReviews.get(rv.prId)!.push({ reviewId: rv.reviewId, createdAt: rv.createdAt! });
+      }
+
+      // "Last run" = all reviews within 2 minutes of the newest review per PR
+      // (covers all agents that fired in the same session).
+      const SESSION_WINDOW_MS = 2 * 60 * 1000;
+      const lastRunReviewIds: string[] = [];
+      const lastRunReviewToPr = new Map<string, string>();
+      for (const [prId, reviews] of prReviews) {
+        if (reviews.length === 0) continue;
+        const newestAt = reviews[0].createdAt.getTime(); // sorted newest-first
+        for (const r of reviews) {
+          if (newestAt - r.createdAt.getTime() <= SESSION_WINDOW_MS) {
+            lastRunReviewIds.push(r.reviewId);
+            lastRunReviewToPr.set(r.reviewId, prId);
+          } else break;
+        }
+      }
+
+      if (lastRunReviewIds.length > 0) {
+        const findingRows = await container.db
+          .select({ reviewId: t.findings.reviewId, severity: t.findings.severity, cnt: count() })
+          .from(t.findings)
+          .where(
+            and(
+              inArray(t.findings.reviewId, lastRunReviewIds),
+              isNull(t.findings.acceptedAt),
+              isNull(t.findings.dismissedAt),
+            ),
+          )
+          .groupBy(t.findings.reviewId, t.findings.severity);
+        for (const row of findingRows) {
+          const prId = lastRunReviewToPr.get(row.reviewId);
+          if (!prId) continue;
+          const cur = findingsBySeverityByPr.get(prId) ?? { critical: 0, warning: 0, suggestion: 0 };
+          if (row.severity === 'CRITICAL') cur.critical += Number(row.cnt);
+          else if (row.severity === 'WARNING') cur.warning += Number(row.cnt);
+          else if (row.severity === 'SUGGESTION') cur.suggestion += Number(row.cnt);
+          findingsBySeverityByPr.set(prId, cur);
+        }
       }
     }
 
@@ -156,6 +208,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         updated_at: r.updatedAt?.toISOString() ?? null,
         score: review ? review.score : null,
         cost_usd: review ? review.cost_usd : null,
+        findings_by_severity: findingsBySeverityByPr.get(r.id) ?? null,
       };
     });
   });
