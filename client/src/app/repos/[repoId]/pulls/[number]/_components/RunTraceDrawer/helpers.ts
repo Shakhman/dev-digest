@@ -26,3 +26,10 @@ export function formatSeconds(ms: number): string {
 export function formatTokens(tokensIn: number, tokensOut: number): string {
   return `${(tokensIn / 1000).toFixed(0)}k→${(tokensOut / 1000).toFixed(1)}k`;
 }
+
+/** Compact dollar cost. Returns "—" for null/zero (no-data sentinel). */
+export function formatCost(usd: number | null | undefined): string {
+  if (usd == null) return "—";
+  if (usd < 0.01) return `$${usd.toFixed(4)}`;
+  return `$${usd.toFixed(3)}`;
+}

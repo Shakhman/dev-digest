@@ -31,4 +31,4 @@ Always use hermetic runner unless your local DB has only the seed data.
 
 ## Further
 README.md — flow coverage table, env knobs, hermetic runner details
-INSIGHTS.md — timing issues, locator patterns that work (create when needed)
+INSIGHTS.md — session wrap-ups and gotchas (append-only, see insights skill)

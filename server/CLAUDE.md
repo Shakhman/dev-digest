@@ -35,4 +35,4 @@ repos · pulls · reviews · agents · polling · settings · workspace · repo-
 README.md — full request/DI flow + API map diagram
 docs/     — architecture decisions (create when needed)
 specs/    — feature specs and API contracts (create when needed)
-INSIGHTS.md — gotchas discovered in development (create when needed)
+INSIGHTS.md — session wrap-ups and gotchas (append-only, see insights skill)

@@ -154,18 +154,24 @@ export function FindingsTab({
         )
       ) : (
         prId &&
-        runs.map((review, i) => (
-          <ReviewRunAccordion
-            key={review.id}
-            review={review}
-            prId={prId}
-            defaultOpen={i === 0}
-            repoFullName={repoFullName}
-            headSha={headSha}
-            targetRunId={target?.runId ?? null}
-            targetNonce={target?.n ?? 0}
-          />
-        ))
+        runs.map((review, i) => {
+          const runSummary = prRuns?.find((r) => r.run_id === review.run_id);
+          return (
+            <ReviewRunAccordion
+              key={review.id}
+              review={review}
+              prId={prId}
+              defaultOpen={i === 0}
+              repoFullName={repoFullName}
+              headSha={headSha}
+              targetRunId={target?.runId ?? null}
+              targetNonce={target?.n ?? 0}
+              costUsd={runSummary?.cost_usd}
+              tokensIn={runSummary?.tokens_in}
+              tokensOut={runSummary?.tokens_out}
+            />
+          );
+        })
       )}
     </section>
   );

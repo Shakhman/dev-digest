@@ -39,4 +39,4 @@ skills · memory · specs · callers — assemblePrompt skips omitted slots
 README.md — pipeline diagram + public API list
 docs/     — engine design decisions (create when needed)
 specs/    — finding schema and grounding rules (create when needed)
-INSIGHTS.md — LLM output patterns, grounding edge cases (create when needed)
+INSIGHTS.md — session wrap-ups and gotchas (append-only, see insights skill)
