@@ -8,6 +8,8 @@ so the next agent/session doesn't relearn it. Append-only — see the
 
 ## What Doesn't Work
 
+- **2026-06-21** — DeepSeek models (e.g. `deepseek/deepseek-v4-flash`) on OpenRouter silently ignore `response_format: { type: 'json_schema', strict: true }`. The model returns a response but `parseWithRepair` fails every attempt and `completeStructured` throws `"OpenRouter structured output failed schema validation for <schemaName>"`. Any feature using `completeStructured` must route through an OpenAI-family model on OpenRouter (e.g. `openai/gpt-4.1-mini`). Fixed for `conventions` by changing `FEATURE_MODELS` default. Evidence: `reviewer-core/src/llm/openrouter.ts:68-115`, `server/src/vendor/shared/contracts/platform.ts:73`.
+
 ## Codebase Patterns
 
 - **2026-06-18** — `POST /skills/import` must be registered BEFORE `GET /skills/:id` in Fastify routes, otherwise Fastify matches the literal segment `import` as a UUID param and returns 422. Fixed by registering the static path first. Evidence: `server/src/modules/skills/routes.ts:60`.
@@ -27,6 +29,11 @@ so the next agent/session doesn't relearn it. Append-only — see the
 - **2026-06-14** — Adding a required field to a Zod contract (`RunStats.cost_usd`) breaks the inline fixture in `server/test/contracts.test.ts` (RunTrace parse). Update the `stats: {…}` fixture in the same change. Evidence: `server/test/contracts.test.ts:160`.
 
 ## Session Notes
+
+### 2026-06-21
+- Built Conventions Extractor end-to-end (L02): `modules/conventions/` (extractor, repository, service, routes, helpers), migration 0012 (`category` + `created_at`), `ConventionSkillDraft` contract (lock-step both vendor copies), client hooks + ConventionsView + ConventionCard + CreateSkillModal.
+- Added API Contract Review skill set to `.claude/skills/api-contract-review/` (SKILL.md + 4 companion rule files: breaking-change, response-schema, semver-discipline, deprecation-policy).
+- Fixed: conventions scan error ("schema validation failed") caused by DeepSeek not honoring strict json_schema on OpenRouter — switched `conventions` feature model to `openrouter / openai/gpt-4.1-mini`.
 
 ### 2026-06-18
 - Built Skills feature (L02) end-to-end: server module (`modules/skills/` — routes/service/repository/helpers), schema migration 0011 (`message` column on `skill_versions`), `SkillVersion`/`SkillStats`/`SkillImportPreview` contracts (lock-step in both vendor copies), `fflate` for ZIP preview, skills wiring in `run-executor.ts`, seed catalog (8 skills + Test Quality Reviewer agent).
