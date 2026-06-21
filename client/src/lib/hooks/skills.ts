@@ -116,7 +116,11 @@ export function useSetAgentSkills() {
   return useMutation({
     mutationFn: ({ agentId, skillIds }: { agentId: string; skillIds: string[] }) =>
       api.post(`/agents/${agentId}/skills`, { skill_ids: skillIds }),
-    onSuccess: (_d, { agentId }) => {
+    onSettled: (_d, _err, { agentId }) => {
+      // Invalidate on both success AND error so the SkillsTab's local orderedIds
+      // state always re-syncs from the server. Without this, a failed mutation
+      // leaves the optimistic "empty" local state while the DB still holds the
+      // old links — causing the run-executor to find skills the UI says are gone.
       qc.invalidateQueries({ queryKey: ["agent-skill-links", agentId] });
     },
   });

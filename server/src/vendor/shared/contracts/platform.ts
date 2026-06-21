@@ -74,8 +74,13 @@ export const FEATURE_MODELS: FeatureModelDef[] = [
     id: 'conventions',
     label: 'Conventions',
     description: 'Extracts coding conventions from the repo.',
-    defaultProvider: 'openai',
-    defaultModel: 'gpt-5.4',
+    // OpenRouter (so a BYO OpenRouter key is enough — no separate OpenAI key),
+    // but an OpenAI-family model because the extractor uses strict json_schema
+    // structured output. DeepSeek models don't reliably honor strict mode on
+    // OpenRouter, so they fail parse-with-repair and throw "schema validation
+    // failed". OpenAI models via OpenRouter support strict outputs.
+    defaultProvider: 'openrouter',
+    defaultModel: 'openai/gpt-4.1-mini',
   },
 ];
 
