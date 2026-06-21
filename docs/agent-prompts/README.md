@@ -10,6 +10,16 @@ in the DB). The canonical, reviewable copies live next to this file:
 - [`security-reviewer.md`](./security-reviewer.md)
 - [`performance-reviewer.md`](./performance-reviewer.md)
 
+> The **API Contract Reviewer** prompt and its four importable rule skills
+> (`breaking-change`, `response-schema`, `semver-discipline`, `deprecation-policy`)
+> now live as a single skill at
+> [`.claude/skills/api-contract-review/`](../../.claude/skills/api-contract-review/SKILL.md):
+> `SKILL.md` holds the reviewer prompt; each companion `.md` is a standalone rule you
+> can also upload via the Skills tab (`POST /skills/import`) and link to a product
+> agent. To validate the agent, run a PR that renames a response field or retypes a
+> route param twice — once with no skills linked (the bare prompt under-reports), then
+> with the four skills linked (it catches the break and cites `file:line`).
+
 > The DB is the source of truth at run time. These files are the human-readable
 > originals — when you change a prompt, edit the file here **and** push it to the
 > agent (`PUT /agents/:id`, which versions the change into `agent_versions`).
