@@ -24,5 +24,8 @@ test-results/
 # emdash worktree config (local)
 .emdash.json
 
+# Claude agent worktrees (local scratch branches, never pushed)
+.claude/worktrees/
+
 # pr-self-review local gate state (per-dev, regenerated each run)
 .pr-self-review.json

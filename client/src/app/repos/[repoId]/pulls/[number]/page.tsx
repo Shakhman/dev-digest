@@ -68,7 +68,16 @@ export default function PRDetailPage() {
     else sp.set(key, val);
     router.replace(`/repos/${repoId}/pulls/${number}${sp.toString() ? `?${sp.toString()}` : ""}`);
   };
-  const setTab = (t: string) => setParam("tab", t);
+  // Switching tabs clears transient params so a stale ?finding/:trace doesn't
+  // hijack navigation (e.g. clicking "Files changed" after a finding deep-link
+  // would immediately bounce back to findings if ?finding= was left behind).
+  const setTab = (t: string) => {
+    const sp = new URLSearchParams(search.toString());
+    sp.set("tab", t);
+    sp.delete("finding");
+    sp.delete("trace");
+    router.replace(`/repos/${repoId}/pulls/${number}?${sp.toString()}`);
+  };
 
   // Reviews come newest-first; each is its own run (grouped into accordions).
   const runs = reviews ?? [];
@@ -173,6 +182,19 @@ export default function PRDetailPage() {
             filesCount={pr.files_count}
             files={pr.files}
             canComment={pr.status === "open"}
+            reviews={runs}
+            repoFullName={repoFullName}
+            headSha={pr.head_sha}
+            onFindingClick={(id) => {
+              // Must set both params atomically — setParam only touches one key
+              // at a time, so calling it twice would lose the first update.
+              // Without tab=findings the diff tab stays active and the focus
+              // is silently dropped.
+              const sp = new URLSearchParams(search.toString());
+              sp.set("finding", id);
+              sp.set("tab", "findings");
+              router.replace(`/repos/${repoId}/pulls/${number}?${sp.toString()}`);
+            }}
           />
         )}
       </div>
