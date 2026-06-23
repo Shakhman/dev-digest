@@ -20,6 +20,12 @@ user asks about FIRST — these are curated and may already answer it — then r
 - Modules are registered statically in `server/src/modules/index.ts` (no filesystem autoload).
 - ESM: relative imports carry the `.js` extension.
 
+## Commit policy (HARD RULE)
+**Never run `git commit`, `git push`, `git add`, or any other git write operation without explicit
+user instruction.** Finishing implementation work does NOT imply permission to commit. Always wait
+for the user to say "commit", "push", or equivalent before touching git history. This applies to
+all agents (including implementer subagents) — the check-gate hook does NOT cover `git commit`.
+
 ## Do-not-touch
 - `server/src/vendor/shared/` and `server/src/db/migrations/` — never hand-edit without coordination.
 

@@ -54,15 +54,26 @@ export async function upsertIntent(db: Db, prId: string, intent: Intent): Promis
       intent: intent.intent,
       inScope: intent.in_scope,
       outOfScope: intent.out_of_scope,
+      riskAreas: intent.risk_areas,
     })
     .onConflictDoUpdate({
       target: t.prIntent.prId,
-      set: { intent: intent.intent, inScope: intent.in_scope, outOfScope: intent.out_of_scope },
+      set: {
+        intent: intent.intent,
+        inScope: intent.in_scope,
+        outOfScope: intent.out_of_scope,
+        riskAreas: intent.risk_areas,
+      },
     });
 }
 
 export async function getIntent(db: Db, prId: string): Promise<Intent | undefined> {
   const [row] = await db.select().from(t.prIntent).where(eq(t.prIntent.prId, prId));
   if (!row) return undefined;
-  return { intent: row.intent, in_scope: row.inScope, out_of_scope: row.outOfScope };
+  return {
+    intent: row.intent,
+    in_scope: row.inScope,
+    out_of_scope: row.outOfScope,
+    risk_areas: row.riskAreas,
+  };
 }

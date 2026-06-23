@@ -8,6 +8,7 @@ import type { ReviewRepository, FindingRow, PullRow, ReviewRow } from './reposit
 import { REVIEW_STRATEGY } from './constants.js';
 import { taskLine } from './helpers.js';
 import { loadDiff } from './diff-loader.js';
+import { runIntentStep } from './intent-step.js';
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
 export class RunCancelledError extends Error {
@@ -104,6 +105,9 @@ export class ReviewRunExecutor {
       return;
     }
     runLog.info(`Diff ready — ${diff.files.length} changed file(s); starting ${jobs.length} agent run(s)`);
+
+    // Best-effort intent extraction (pre-work; failures never abort the review).
+    await runIntentStep(this.container, this.repo, workspaceId, pull, repo, diff, runLog);
 
     for (const { agent, runId } of jobs) {
       const agentStart = Date.now();
