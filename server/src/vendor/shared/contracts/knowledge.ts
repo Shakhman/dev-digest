@@ -171,6 +171,7 @@ export type SkillImportPreview = z.infer<typeof SkillImportPreview>;
 // ---- Conventions ----
 export const ConventionCandidate = z.object({
   id: z.string(),
+  category: z.string().nullish(),
   rule: z.string(),
   evidence_path: z.string(),
   evidence_snippet: z.string(),
@@ -178,6 +179,19 @@ export const ConventionCandidate = z.object({
   accepted: z.boolean(),
 });
 export type ConventionCandidate = z.infer<typeof ConventionCandidate>;
+
+/**
+ * Editable draft for a single skill merged from accepted convention candidates.
+ * Returned by `GET /repos/:id/conventions/skill-draft`; the UI lets the user
+ * tweak it before POSTing to `/skills`.
+ */
+export const ConventionSkillDraft = z.object({
+  name: z.string(),
+  description: z.string(),
+  body: z.string(),
+  evidence_files: z.array(z.string()),
+});
+export type ConventionSkillDraft = z.infer<typeof ConventionSkillDraft>;
 
 // ---- Agents ----
 // 'openrouter' routes through the OpenAI-compatible API (OpenAIProvider with a
