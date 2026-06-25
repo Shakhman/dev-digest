@@ -8,6 +8,8 @@ so the next agent/session doesn't relearn it. Append-only — see the
 
 ## What Doesn't Work
 
+- **2026-06-23** — Lock-file classifier `$`-anchored regexes fail silently on two edge cases: (1) paths with trailing whitespace or `\r` (e.g. from Windows line endings in DB storage) — `"yarn.lock\r"` does NOT match `/\.lock$/`; (2) versioned lock-file names (`pnpm-lock-2.yaml`) miss exact-name patterns. Fix: `.trim()` the path before any regex test, and use greedy patterns like `/pnpm-lock[^/]*\.ya?ml$/` instead of exact names. Evidence: `server/src/modules/smart-diff/classifier.ts`, `constants.ts`.
+
 - **2026-06-21** — DeepSeek models (e.g. `deepseek/deepseek-v4-flash`) on OpenRouter silently ignore `response_format: { type: 'json_schema', strict: true }`. The model returns a response but `parseWithRepair` fails every attempt and `completeStructured` throws `"OpenRouter structured output failed schema validation for <schemaName>"`. Any feature using `completeStructured` must route through an OpenAI-family model on OpenRouter (e.g. `openai/gpt-4.1-mini`). Fixed for `conventions` by changing `FEATURE_MODELS` default. Evidence: `reviewer-core/src/llm/openrouter.ts:68-115`, `server/src/vendor/shared/contracts/platform.ts:73`.
 
 ## Codebase Patterns

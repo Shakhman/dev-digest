@@ -10,6 +10,10 @@ so the next agent/session doesn't relearn it. Append-only — see the
 
 ## What Doesn't Work
 
+- **2026-06-23** — `setParam(key, val)` is **not batch-safe**: it reads the current `search` snapshot, so two sequential calls both see the same stale params and the second call's write wins, silently dropping the first. Any multi-param URL mutation must build a single `URLSearchParams` from `search.toString()`, set/delete all keys on it, and call `router.replace` once. Evidence: `client/src/app/repos/[repoId]/pulls/[number]/page.tsx` (atomic `onFindingClick` and `setTab`).
+
+- **2026-06-23** — Stale `?finding` / `?trace` query params cause **tab redirect loops**: if `?tab=diff&finding=<id>` is in the URL, the tab derivation `search.get("tab") ?? (focusFindingId ? "findings" : "overview")` resolves to `"diff"`, but an unguarded `setTab("diff")` that doesn't clear `?finding` leaves the redirect trigger alive, bouncing back to `findings` on the next render cycle. Fix: `setTab` must atomically delete both `finding` and `trace` before calling `router.replace`. Evidence: `client/src/app/repos/[repoId]/pulls/[number]/page.tsx:74-79`.
+
 - **2026-06-21** — `useSetAgentSkills` with `onSuccess`-only invalidation leaves stale optimistic state after a **failed** mutation: `orderedIds` stays empty in the SkillsTab while the DB keeps the old links. UI shows "0 of N enabled"; run logs show skills still attached. Fix: use `onSettled` (fires on both success and error) to force `["agent-skill-links", agentId]` re-fetch. Evidence: `client/src/lib/hooks/skills.ts:119`.
 
 - **2026-06-17** — The PR-list `tableCard` has `overflow: "hidden"` (`pulls/styles.ts`) which CLIPS absolutely-positioned hover popovers (`FindingsHoverCard`) opening downward from the bottom rows; upper rows render fine (matching the design). `FindingsHoverCard` is dependency-free (anchor wrapper + `position:absolute` panel) — to fully escape the card it would need a portal + `position:fixed` from the anchor's `getBoundingClientRect`. Deferred; not needed for the common case. Evidence: `client/src/components/FindingsHoverCard/`, `pulls/styles.ts:97`.
@@ -30,9 +34,21 @@ so the next agent/session doesn't relearn it. Append-only — see the
 
 ## Tool & Library Notes
 
+- **2026-06-23** — GitHub's REST API omits the `patch` field (`null`) for any file whose diff exceeds roughly 1,000 changed lines (e.g. a lock file with +4,000 lines). The `patch` column in `pr_files` is stored as `null` for these — don't treat it as a bug or a fetch failure. `parsePatch(null)` returns `[]`, which shows the "no diff" fallback. Correct UX: detect `patch == null` explicitly and offer a `githubBlobUrl(repoFullName, headSha, path)` deep-link instead. Evidence: `client/src/app/repos/[repoId]/pulls/[number]/_components/SmartDiffViewer/SmartDiffFileRow.tsx`, `server/src/modules/pulls/routes.ts:284`.
+
 ## Recurring Errors & Fixes
 
+- **2026-06-23** — React warning "Updating a style property during rerender (`borderColor`) when a conflicting property is set (`borderLeftColor`) will act like the singular property is temporarily set to `null`" fires when a component toggles between **shorthand** (`borderColor`, `borderWidth`) and **longhand** (`borderLeftColor`, `borderLeftWidth`) properties on the same rerender. Fix: replace all shorthands with per-side longhands (`borderTopColor`, `borderRightColor`, `borderBottomColor`, `borderLeftColor` / `…Width`) — never mix the two in the same style object across conditional branches. Evidence: `client/src/app/repos/[repoId]/pulls/[number]/_components/FindingCard/styles.ts`.
+
 ## Session Notes
+
+### 2026-06-23
+- Built Smart Diff feature (zero LLM cost): `SmartDiffViewer` component tree (`SmartDiffGroupSection`, `SmartDiffFileRow`, co-located `styles.ts` / `constants.ts`), `useSmartDiff` hook in `lib/hooks/reviews.ts`, `DiffTab` extended with smart/original toggle.
+- Fixed `onFindingClick` to atomically set `?tab=findings&finding=:id` (single `URLSearchParams` mutation); fixed `setTab` to clear `?finding` and `?trace` transient params.
+- Fixed React CSS shorthand/longhand conflict in `FindingCard/styles.ts` (all per-side longhands).
+- Fixed core file rows not auto-expanding (`SmartDiffGroupSection` was hardcoding `defaultExpanded={false}`).
+- Set wiring group default expansion to `true` (`SmartDiffViewer/constants.ts`).
+- Added `githubBlobUrl` fallback link when `patch == null` (large files GitHub won't inline); threaded `repoFullName` + `headSha` through page → DiffTab → SmartDiffViewer → SmartDiffGroupSection → SmartDiffFileRow.
 
 ### 2026-06-21
 - Built Conventions client UI: `lib/hooks/conventions.ts`, ConventionsView, ConventionCard (accept/reject/edit, "Accepted" badge, Create Skill CTA), CreateSkillModal (skill-draft pre-fill, Enabled toggle, Type side-by-side layout).

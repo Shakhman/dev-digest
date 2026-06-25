@@ -57,3 +57,7 @@ export {
 // The single OpenAI-compatible structured provider (OpenRouter), shared by the
 // CI runner and the server's openrouter path. Owns session grouping + guards.
 export { OpenRouterProvider, type OpenRouterProviderOptions } from './llm/openrouter.js';
+
+// Intent extraction — pure LLM call that derives PR intent, scope, and risk
+// areas from the diff (+ optional description / linked issue / plan docs).
+export { extractIntent } from './intent/extractor.js';

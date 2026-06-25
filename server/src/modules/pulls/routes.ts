@@ -1,8 +1,14 @@
+import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { and, desc, eq, inArray } from 'drizzle-orm';
-import type { PrMeta, PrDetail, GitHubClient, PrReviewComment } from '@devdigest/shared';
-import { PrCommentInput } from '@devdigest/shared';
+import type { PrMeta, PrDetail, GitHubClient, PrReviewComment, Intent } from '@devdigest/shared';
+import { PrCommentInput, Intent as IntentSchema } from '@devdigest/shared';
+import { getIntent } from '../reviews/repository/pull.repo.js';
+import { ReviewRepository } from '../reviews/repository.js';
+import { loadDiff } from '../reviews/diff-loader.js';
+import { runIntentStep } from '../reviews/intent-step.js';
+import { RunLogger } from '../../platform/run-logger.js';
 import * as t from '../../db/schema.js';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
@@ -407,6 +413,60 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         const msg = err instanceof Error ? err.message : 'Failed to post the comment to GitHub.';
         throw new AppError('github_comment_failed', msg, 400, { cause: String(err) });
       }
+    },
+  );
+
+  // ---- Intent layer -------------------------------------------------------
+  // Returns the LLM-extracted intent for a PR. Populated as a pre-work step
+  // during any review run; 404 until the first review has run.
+  app.get(
+    '/pulls/:id/intent',
+    { schema: { params: IdParams, response: { 200: IntentSchema } } },
+    async (req): Promise<Intent> => {
+      const { workspaceId } = await getContext(container, req);
+      // Workspace-scope: verify the PR belongs to this workspace before returning.
+      const [pr] = await container.db
+        .select()
+        .from(t.pullRequests)
+        .where(
+          and(
+            eq(t.pullRequests.workspaceId, workspaceId),
+            eq(t.pullRequests.id, req.params.id),
+          ),
+        );
+      if (!pr) throw new NotFoundError('Pull request not found');
+
+      const intent = await getIntent(container.db, pr.id);
+      if (!intent) throw new NotFoundError('Intent not yet extracted for this pull request');
+      return intent;
+    },
+  );
+
+  // Force re-extraction of intent for a PR (bypasses idempotency check).
+  // Loads the current diff, runs extractIntent, persists, and returns the result.
+  app.post(
+    '/pulls/:id/intent/recompute',
+    { schema: { params: IdParams, response: { 200: IntentSchema } } },
+    async (req): Promise<Intent> => {
+      const { workspaceId } = await getContext(container, req);
+      const { pr, repo } = await resolvePrAndRepo(req.params.id, workspaceId);
+
+      const reviewRepo = new ReviewRepository(container.db);
+      const diff = await loadDiff(container, reviewRepo, workspaceId, pr, repo);
+
+      // Use a temporary run ID so log events are buffered on the bus but not
+      // persisted — nobody subscribes to this channel for a one-shot recompute.
+      const tmpRunId = `recompute-${randomUUID()}`;
+      const runLog = new RunLogger(container.runBus, [tmpRunId]);
+      try {
+        await runIntentStep(container, reviewRepo, workspaceId, pr, repo, diff, runLog, true);
+      } finally {
+        container.runBus.complete(tmpRunId);
+      }
+
+      const intent = await getIntent(container.db, pr.id);
+      if (!intent) throw new NotFoundError('Intent extraction did not produce a result');
+      return intent;
     },
   );
 }
