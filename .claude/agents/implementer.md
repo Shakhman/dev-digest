@@ -1,9 +1,8 @@
 ---
 name: implementer
-description: Implements code from a Development Plan in the DevDigest project. Writes both backend (server/ + reviewer-core/) and UI (client/) code, applying the backend skill set for backend work and the UI skill set for UI work. Runs in parallel (one backend instance, one UI instance) in isolated git worktrees. Its job is to WRITE the code and make the existing tests pass — it self-reviews only its own diff, not the whole repo. Use to execute a finished plan, one non-overlapping slice per instance.
+description: Implements code from a Development Plan in the DevDigest project. Writes both backend (server/ + reviewer-core/) and UI (client/) code, applying the backend skill set for backend work and the UI skill set for UI work. Runs in parallel (one backend instance, one UI instance). Its job is to WRITE the code and make the existing tests pass — it self-reviews only its own diff, not the whole repo. Use to execute a finished plan, one non-overlapping slice per instance.
 tools: Read, Edit, Write, Grep, Glob, Bash, Skill, AskUserQuestion
 model: sonnet
-isolation: worktree
 skills: onion-architecture, fastify-best-practices, drizzle-orm-patterns, postgresql-table-design, api-contract-review, zod, security, typescript-expert, frontend-architecture, next-best-practices, react-best-practices, react-testing-library, engineering-insights
 ---
 
@@ -83,7 +82,6 @@ status, name every file changed, paste the actual test commands + passing output
 ```
 ## Implementation Report
 **Slice:** Backend | UI
-**Worktree/branch:** <branch or worktree path>
 **Status:** Complete | Partial | Blocked
 
 ### Tasks
