@@ -64,6 +64,33 @@ export interface ConventionLocal {
   accepted: boolean;
 }
 
+export interface BlastCallerLocal {
+  file: string;
+  symbol: string;
+  line: number;
+  rank: number;
+}
+
+export interface BlastNodeLocal {
+  file: string;
+  name: string;
+  kind: string;
+  callers: BlastCallerLocal[];
+  endpoints: string[];
+  crons: string[];
+}
+
+/** Mirrors the server `BlastMap` contract (GET /pulls/:id/blast). */
+export interface BlastMapLocal {
+  state: 'ok' | 'empty' | 'degraded';
+  symbols: BlastNodeLocal[];
+  symbol_count: number;
+  caller_count: number;
+  endpoint_count: number;
+  cron_count: number;
+  degraded_reason: string | null;
+}
+
 export interface ApiClient {
   listRepos(): Promise<RepoDto[]>;
   listPulls(repoId: string): Promise<PullDto[]>;
@@ -72,6 +99,7 @@ export interface ApiClient {
   listRuns(prId: string): Promise<RunSummaryDto[]>;
   listReviews(prId: string): Promise<ReviewDtoLocal[]>;
   listConventions(repoId: string): Promise<ConventionLocal[]>;
+  getBlastRadius(prId: string): Promise<BlastMapLocal>;
 }
 
 export function createApiClient(baseUrl: string): ApiClient {
@@ -143,6 +171,10 @@ export function createApiClient(baseUrl: string): ApiClient {
 
     listConventions(repoId: string): Promise<ConventionLocal[]> {
       return get<ConventionLocal[]>(`/repos/${repoId}/conventions`);
+    },
+
+    getBlastRadius(prId: string): Promise<BlastMapLocal> {
+      return get<BlastMapLocal>(`/pulls/${prId}/blast`);
     },
   };
 }

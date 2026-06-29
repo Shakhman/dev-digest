@@ -1,4 +1,4 @@
-import type { FindingLocal, ReviewDtoLocal } from './api-client.js';
+import type { BlastNodeLocal, FindingLocal, ReviewDtoLocal } from './api-client.js';
 
 /** Filter reviews within 120s window of newest for "latest session" */
 export const BATCH_WINDOW_MS = 120_000;
@@ -70,6 +70,33 @@ export function pickLatestSession(reviews: ReviewDtoLocal[]): ReviewDtoLocal[] {
   return filtered.filter(
     (r) => newestAt - new Date(r.created_at).getTime() <= BATCH_WINDOW_MS,
   );
+}
+
+export interface TrimmedBlastNode {
+  symbol: string;
+  file: string;
+  kind: string;
+  /** Callers as "path:line" deep-link refs, rank-sorted (most important first). */
+  callers: string[];
+  endpoints: string[];
+  crons: string[];
+}
+
+/**
+ * Trim one blast-radius node for the wire: collapse each caller to a
+ * "file:line" ref (the array is already rank-sorted by the server) and drop
+ * empty endpoint/cron arrays so the payload stays compact for the model.
+ */
+export function trimBlastNode(n: BlastNodeLocal): TrimmedBlastNode {
+  const node: TrimmedBlastNode = {
+    symbol: n.name,
+    file: n.file,
+    kind: n.kind,
+    callers: n.callers.map((c) => `${c.file}:${c.line}`),
+    endpoints: n.endpoints,
+    crons: n.crons,
+  };
+  return node;
 }
 
 /** Wrap any value as a single MCP text content block */

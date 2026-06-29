@@ -16,6 +16,8 @@ Durable findings for the MCP server package. Append-only; never overwrite existi
 
 - **2026-06-27** — `PrMeta.id` is `.nullish()` in the API contract. When resolving a PR number to its UUID, always null-guard (`found.id == null`) before returning; throw `ToolError` if null. Evidence: `mcp/src/resolve.ts`.
 
+- **2026-06-28** — The MCP tools resolve PRs by **number only** (`get_blast_radius`/`get_findings` take `repo` + `pr:int`), and there is no MCP tool to list pulls. When a user references a PR by **title**, resolve it out-of-band against the server REST API: `GET /repos` (match `full_name`) → `GET /repos/:id/pulls` (match title → number), then call the MCP tool. Default API base is `http://localhost:3001`. Evidence: `mcp/src/tools/get-blast-radius.ts:22`, `mcp/src/config.ts`.
+
 ## Tool & Library Notes
 
 - **2026-06-27** — `McpServer.tool()` from `@modelcontextprotocol/sdk/server/mcp.js` takes a **raw Zod shape** (`Record<string, ZodTypeAny>`) as the third argument — NOT a full `z.object({...})` schema. The callback receives the already-parsed, fully-typed args as `ShapeOutput<Shape>`. Passing `z.object({...})` instead of the shape causes a type mismatch. Evidence: `mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-compat.d.ts`.

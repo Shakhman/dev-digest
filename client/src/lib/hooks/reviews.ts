@@ -14,6 +14,7 @@ import type {
   RunEvent,
   RunSummary,
   SmartDiff,
+  BlastMap,
 } from "@devdigest/shared";
 
 // ---- Active (in-flight) runs — server-side source of truth ----
@@ -93,6 +94,16 @@ export function useSmartDiff(prId: string | null | undefined) {
     queryKey: ["smart-diff", prId],
     queryFn: () => api.get<SmartDiff>(`/pulls/${prId}/smart-diff`),
     enabled: !!prId,
+  });
+}
+
+// ---- Blast Radius — PR impact map (read from the repo-intel index) ----
+export function useBlast(prId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["pr-blast", prId],
+    queryFn: () => api.get<BlastMap>(`/pulls/${prId}/blast`),
+    enabled: !!prId,
+    staleTime: 5 * 60_000,
   });
 }
 

@@ -17,7 +17,7 @@ five DevDigest tools over **stdio** transport.
 | `run_agent_on_pr` | Run one reviewer agent on a PR and wait for the verdict + findings |
 | `get_findings` | Read the latest review verdict + findings for a PR (read-only, no new run) |
 | `get_conventions` | _(stub — lands in a later lesson)_ |
-| `get_blast_radius` | _(stub — lands in a later lesson)_ |
+| `get_blast_radius` | PR impact map for a PR: changed symbols, their callers (file:line), and reachable endpoints/crons (read-only, from the repo-intel index) |
 
 ---
 
@@ -158,7 +158,8 @@ Open the URL printed in the terminal. Expected results:
 | `list_agents` | Returns seeded agents by name, no UUIDs |
 | `run_agent_on_pr("owner/repo", 1, "<agent name>")` | Polls until done; returns `{ verdict, score, findings[] }` |
 | `get_findings("owner/repo", 1)` | Returns the same latest session without triggering a new run |
-| `get_conventions` / `get_blast_radius` | Returns `{ status: "not_implemented", message: "…" }` |
+| `get_conventions("owner/repo")` | Returns accepted conventions + pending count for the repo |
+| `get_blast_radius("owner/repo", 1)` | Returns `{ state, symbols[], counts }` from the repo-intel index (degraded/empty when unindexed) |
 
 ### Raw stdio ping (stdout hygiene check)
 
