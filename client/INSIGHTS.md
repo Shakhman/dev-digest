@@ -32,6 +32,8 @@ so the next agent/session doesn't relearn it. Append-only — see the
 - **2026-06-14** — The PR-list table is driven by two parallel constants that MUST stay length-aligned: `COLUMN_KEYS` (header keys + order) and `GRID` (CSS grid-template tracks). Adding a column = add to both AND render a matching cell in `PRRow.tsx`, else header/cells misalign silently. Evidence: `client/src/app/repos/[repoId]/pulls/constants.ts`.
 - **2026-06-14** — i18n has only the `en` locale (`client/messages/en/`); new UI strings need a key under the right namespace file (e.g. `prReview.json`, `runs.json`) read via `useTranslations("<ns>")`. A missing key renders the raw key, not an error.
 
+- **2026-06-28** — Blast Radius (L04) ships as an Overview-tab PANEL (`BlastCard` rendered by `OverviewTab` in a 2-col grid beside `IntentCard`), NOT a separate PR tab — the design screenshot governed over the written plan's "Blast tab". This forced threading `repoFullName` + `headSha` from `page.tsx` → `OverviewTab` → `BlastCard` for caller `githubBlobUrl` deep-links. The Tree/Graph toggle is a pure client re-render of the same `BlastMap` (no second fetch); the Graph view is a hand-rolled, dependency-free SVG with clickable caller nodes via SVG `<a>`. Evidence: `client/src/app/repos/[repoId]/pulls/[number]/_components/BlastCard/`, `OverviewTab/OverviewTab.tsx`.
+
 ## Tool & Library Notes
 
 - **2026-06-23** — GitHub's REST API omits the `patch` field (`null`) for any file whose diff exceeds roughly 1,000 changed lines (e.g. a lock file with +4,000 lines). The `patch` column in `pr_files` is stored as `null` for these — don't treat it as a bug or a fetch failure. `parsePatch(null)` returns `[]`, which shows the "no diff" fallback. Correct UX: detect `patch == null` explicitly and offer a `githubBlobUrl(repoFullName, headSha, path)` deep-link instead. Evidence: `client/src/app/repos/[repoId]/pulls/[number]/_components/SmartDiffViewer/SmartDiffFileRow.tsx`, `server/src/modules/pulls/routes.ts:284`.
@@ -41,6 +43,11 @@ so the next agent/session doesn't relearn it. Append-only — see the
 - **2026-06-23** — React warning "Updating a style property during rerender (`borderColor`) when a conflicting property is set (`borderLeftColor`) will act like the singular property is temporarily set to `null`" fires when a component toggles between **shorthand** (`borderColor`, `borderWidth`) and **longhand** (`borderLeftColor`, `borderLeftWidth`) properties on the same rerender. Fix: replace all shorthands with per-side longhands (`borderTopColor`, `borderRightColor`, `borderBottomColor`, `borderLeftColor` / `…Width`) — never mix the two in the same style object across conditional branches. Evidence: `client/src/app/repos/[repoId]/pulls/[number]/_components/FindingCard/styles.ts`.
 
 ## Session Notes
+
+### 2026-06-28
+- Built Blast Radius client UI (L04, zero LLM cost): `useBlast` hook (`lib/hooks/reviews.ts`), `BlastCard` component tree (Tree view = nested symbol→callers→endpoint/cron badges; Graph view = hand-rolled SVG node-link, callers→symbols→endpoints/crons), `Tree | Graph` segmented toggle moved into the stats row (right-aligned via `marginLeft:auto`), rendered in `OverviewTab` beside `IntentCard` in a 2-col grid.
+- Color scheme: endpoints = blue (`--accent`), crons = amber (`--warning`), callers = gray/neutral. Caller `file:line` deep-links to `githubBlobUrl(repoFullName, head_sha, file, line)` in both views.
+- Tests `BlastCard.test.tsx`: deep-link href + target, plain-text fallback w/o repo/sha, degraded badge over partial data, empty state, Tree→Graph toggle.
 
 ### 2026-06-23
 - Built Smart Diff feature (zero LLM cost): `SmartDiffViewer` component tree (`SmartDiffGroupSection`, `SmartDiffFileRow`, co-located `styles.ts` / `constants.ts`), `useSmartDiff` hook in `lib/hooks/reviews.ts`, `DiffTab` extended with smart/original toggle.

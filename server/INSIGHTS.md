@@ -8,6 +8,10 @@ so the next agent/session doesn't relearn it. Append-only — see the
 
 ## What Doesn't Work
 
+- **2026-06-28** — The shared barrel (`vendor/shared/index.ts`) re-exports every contract file with `export *`, so a NEW contract file CANNOT reuse a top-level export name that already exists elsewhere — it silently shadows / collides. `brief.ts` already exports `BlastRadius`, `BlastCaller`, `ChangedSymbol`, `DownstreamImpact`. When adding `contracts/blast.ts` (L04 Blast Radius), the new tree shape had to be named `BlastMap*` (`BlastMapCaller`/`BlastMapNode`/`BlastMapState`) to avoid clashing with those. Check `grep "export const" vendor/shared/contracts/*.ts` before naming a new contract. Evidence: `server/src/vendor/shared/contracts/{brief,blast}.ts`, `index.ts`.
+
+- **2026-06-28** — `getBlastRadius` endpoints/crons (`file_facts`) are populated ONLY on the persistent-index path. The degraded/ripgrep fallback returns NO `factsByFile`, so on a non-indexed repo `impactedEndpoints` is best-effort and **crons are always empty** (`cron_count` 0 even when callers exist) — the Blast panel's yellow cron badges never appear. To surface a cron: repo must be fully indexed AND a changed symbol must have a caller in a file matching the `extractCrons` heuristic (`cron.schedule(...)`, `CronJob(...)`, `schedule('* * * * *')`, or `jobs.register('kind')`/`enqueue(ws,'kind')` near poll/index/sync/job words). Evidence: `server/src/modules/repo-intel/service.ts:297-303` (degraded path, no facts) + `:376-382` (factsByFile via getFileFacts), `pipeline/full.ts:187`, `adapters/codeindex/extract.ts:202`.
+
 - **2026-06-23** — Lock-file classifier `$`-anchored regexes fail silently on two edge cases: (1) paths with trailing whitespace or `\r` (e.g. from Windows line endings in DB storage) — `"yarn.lock\r"` does NOT match `/\.lock$/`; (2) versioned lock-file names (`pnpm-lock-2.yaml`) miss exact-name patterns. Fix: `.trim()` the path before any regex test, and use greedy patterns like `/pnpm-lock[^/]*\.ya?ml$/` instead of exact names. Evidence: `server/src/modules/smart-diff/classifier.ts`, `constants.ts`.
 
 - **2026-06-21** — DeepSeek models (e.g. `deepseek/deepseek-v4-flash`) on OpenRouter silently ignore `response_format: { type: 'json_schema', strict: true }`. The model returns a response but `parseWithRepair` fails every attempt and `completeStructured` throws `"OpenRouter structured output failed schema validation for <schemaName>"`. Any feature using `completeStructured` must route through an OpenAI-family model on OpenRouter (e.g. `openai/gpt-4.1-mini`). Fixed for `conventions` by changing `FEATURE_MODELS` default. Evidence: `reviewer-core/src/llm/openrouter.ts:68-115`, `server/src/vendor/shared/contracts/platform.ts:73`.
@@ -22,7 +26,11 @@ so the next agent/session doesn't relearn it. Append-only — see the
 - **2026-06-14** — `completeAgentRun`'s `values` shape is declared in TWO places that must match: the repo fn (`repository/run.repo.ts`) AND the interface wrapper (`repository.ts:151`). Adding a field (e.g. `costUsd`) needs both or typecheck fails.
 - **2026-06-17** — PR-list `GET /repos/:id/pulls` returns the latest batch's FINDINGS as full `Finding[]` records (not counts) under `PrMeta.findings`, mapped via `reviews/helpers.ts#findingRowToDto`; the client derives severity chips AND renders a hover popover from that one array (no second fetch, perfect chip↔popover consistency). The "latest review batch" here is a SEPARATE window from the cost block: cost windows over `agent_runs.ranAt`, findings windows over `reviews.createdAt` (both 120s). A pre-existing `rollupSeverities` helper in `modules/pulls/status.ts` (lowercase keys) was built for a counts-only variant — currently unused by the route. Evidence: `server/src/modules/pulls/routes.ts`.
 
+- **2026-06-28** — Test a `container.repoIntel` consumer by injecting `ContainerOverrides.repoIntel` with a stub facade that returns a fixed `BlastResult` — no real index/clone needed, route stays deterministic and Postgres-only. `buildApp({ overrides: { repoIntel: stubRepoIntel(result) } })`. Evidence: `server/src/platform/container.ts:51,120`, `server/test/blast.it.test.ts`.
+
 ## Tool & Library Notes
+
+- **2026-06-28** — There is NO `depcruise` / dependency-cruiser arch-gate script in this starter (scripts are only `dev/build/start/typecheck/test/db:*`). The `onion-architecture` skill ships one but it is not wired here; the facade-only rule (reach repo-intel via `container.repoIntel.*`, never the pipeline) is enforced by review, not a gate. Don't cite `npm run depcruise` in plans/docs. Evidence: `server/package.json`.
 
 - **2026-06-14** — New DB columns: edit `db/schema/*.ts`, then `npm run db:generate` (drizzle-kit) auto-generates `00NN_*.sql` (e.g. `0010_solid_baron_zemo.sql` = `ALTER TABLE … ADD COLUMN`). Never hand-write migration SQL; apply with `npm run db:migrate`.
 
@@ -31,6 +39,11 @@ so the next agent/session doesn't relearn it. Append-only — see the
 - **2026-06-14** — Adding a required field to a Zod contract (`RunStats.cost_usd`) breaks the inline fixture in `server/test/contracts.test.ts` (RunTrace parse). Update the `stats: {…}` fixture in the same change. Evidence: `server/test/contracts.test.ts:160`.
 
 ## Session Notes
+
+### 2026-06-28
+- Built Blast Radius `blast/` module (L04), zero LLM cost: `GET /pulls/:id/blast` reads `repoIntel.getBlastRadius` (facade only), groups callers by `viaSymbol` into a per-symbol tree, attributes endpoints/crons via `factsByFile`, derives ok/empty/degraded state, never throws. `BlastMap*` contract added lock-step in both vendor copies (named `BlastMap*` to avoid clashing with `brief.ts`'s `BlastRadius`/`BlastCaller`/`ChangedSymbol`).
+- Dropped the planned optional LLM summary + `blast_summary` feature-model (screenshot shows no summary; AC allows zero model calls). Route touches `container.llm` nowhere.
+- Test via injected `repoIntel` stub (`blast.it.test.ts`): ok/empty/degraded + 404.
 
 ### 2026-06-21
 - Built Conventions Extractor end-to-end (L02): `modules/conventions/` (extractor, repository, service, routes, helpers), migration 0012 (`category` + `created_at`), `ConventionSkillDraft` contract (lock-step both vendor copies), client hooks + ConventionsView + ConventionCard + CreateSkillModal.
