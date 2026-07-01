@@ -6,19 +6,50 @@
   "resync": "Resync",
   "resyncing": "Resyncing…",
   "indexStatus": "Index status: {status}",
-  "loadError": "Couldn’t load specs",
+  "loadError": "Couldn't load specs",
   "kb": "{kb}kb",
   "empty": {
     "title": "No spec files yet",
     "body": "Drop your PRDs, tech specs, and acceptance criteria under .devdigest/specs/. Every agent and the PR brief read them as grounding context."
   },
+  "noClone": {
+    "title": "Repo not cloned yet",
+    "body": "No clone found on disk. Refresh the repo to trigger a clone, then come back."
+  },
   "mode": {
-    "preview": "preview",
-    "edit": "edit"
+    "preview": "Preview",
+    "edit": "Edit"
   },
   "editor": {
-    "loadError": "Couldn’t load spec",
+    "loadError": "Couldn't load spec",
     "save": "Save",
     "saving": "Saving…"
+  },
+  "file": {
+    "tokens": "{count} tok",
+    "usedBy": "Used by {count} agents",
+    "coverage": "{used} / {total} agents"
+  },
+  "footer": {
+    "files": "{count} files",
+    "sep": "·"
+  },
+  "contextTab": {
+    "title": "Project context",
+    "attached": "{count} attached",
+    "filterPlaceholder": "Filter documents…",
+    "orderHint": "Order matters — earlier docs appear first in the prompt. Toggle to attach.",
+    "tokenEstimate": "~{count} tok total",
+    "effectiveContext": "Effective context (own + inherited)",
+    "noEffectiveDocs": "No documents in effective context.",
+    "missingBadge": "missing",
+    "preview": "Preview",
+    "inherited": "inherited"
+  },
+  "traceBlock": {
+    "projectContext": "Project context",
+    "untrustedNote": "attached specs (untrusted)",
+    "specsRead": "Specs read",
+    "none": "none"
   }
 }

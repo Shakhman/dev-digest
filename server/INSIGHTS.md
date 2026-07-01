@@ -6,7 +6,11 @@ so the next agent/session doesn't relearn it. Append-only — see the
 
 ## What Works
 
+- **2026-06-30** — Wiring a multi-step container facade (project context: resolve → read → budget) as a standalone `buildProjectContextFacade(container)` factory function defined **before** the Container class avoids circular-dep hoisting issues and keeps the composition root clean. The function references `Container` as a type (hoisted by TS) so it compiles fine. Evidence: `server/src/platform/container.ts:69`.
+
 ## What Doesn't Work
+
+- **2026-06-30** — `await import('drizzle-orm')` / `await import('../../db/schema.js')` inside method bodies compiles in loose mode but is an antipattern: harder to test, breaks tree-shaking, and triggers TS "possibly undefined" noise. Always use static imports at file top for schema and drizzle-orm operators. Evidence: `server/src/modules/reviews/run-executor.ts` (initial draft had dynamic imports; replaced with `import { asc, eq } from 'drizzle-orm'` at top).
 
 - **2026-06-28** — The shared barrel (`vendor/shared/index.ts`) re-exports every contract file with `export *`, so a NEW contract file CANNOT reuse a top-level export name that already exists elsewhere — it silently shadows / collides. `brief.ts` already exports `BlastRadius`, `BlastCaller`, `ChangedSymbol`, `DownstreamImpact`. When adding `contracts/blast.ts` (L04 Blast Radius), the new tree shape had to be named `BlastMap*` (`BlastMapCaller`/`BlastMapNode`/`BlastMapState`) to avoid clashing with those. Check `grep "export const" vendor/shared/contracts/*.ts` before naming a new contract. Evidence: `server/src/vendor/shared/contracts/{brief,blast}.ts`, `index.ts`.
 
@@ -36,9 +40,17 @@ so the next agent/session doesn't relearn it. Append-only — see the
 
 ## Recurring Errors & Fixes
 
+- **2026-06-30** — `fs.readdir({ withFileTypes: true })` returns `Dirent<NonSharedBuffer>[]` (not `Dirent<string>[]`) when TS lib strict mode is on. Fix: import `Dirent` from `node:fs` and cast the return as `Dirent[]`, then access `entry.name as string`. Evidence: `server/src/adapters/fs-docs/index.ts:103`.
+
 - **2026-06-14** — Adding a required field to a Zod contract (`RunStats.cost_usd`) breaks the inline fixture in `server/test/contracts.test.ts` (RunTrace parse). Update the `stats: {…}` fixture in the same change. Evidence: `server/test/contracts.test.ts:160`.
 
+- **2026-06-30** — For the new `agent_context_docs` / `skill_context_docs` link tables (composite PK `(agentId, path)`), no separate index on the FK column is needed: the PK B-tree index is usable on the leftmost prefix (`agentId` alone), satisfying the postgresql-table-design FK-index rule. This pattern applies to any link table where the FK column is the first element of the composite PK. Evidence: `server/src/db/migrations/0014_aspiring_mimic.sql`.
+
 ## Session Notes
+
+### 2026-06-30
+- Implemented T-B0+T-U0 shared pre-work for SPEC-08 Project Context: added `agent_context_docs` and `skill_context_docs` link tables (migration 0014), extended `SpecFile` with `source/tokens/used_by_agents/missing`, added `context_docs` to `AgentVersionConfig`, added `ContextDocLink`/`EffectiveContextDoc` contracts, changed `specs_read` from `string[]` to `{path,tokens}[]` (breaking — lock-step across both vendor copies), added `contextRoots` to `AppConfig`, updated `trace-builder.ts` and `contracts.test.ts` fixture.
+- Implemented T-B1..T-B6 backend slice of SPEC-08: `FsDocs` port+adapter (clone-root-confined fs, symlink guard, cycle-safe walk), `project-context` module (discovery, attachment, effective-context), pure resolver (`resolveOrder`/`admitToBudget`), T-B5 agent version snapshot for `context_docs`, T-B6 run-time injection + trace wiring in `run-executor.ts`. 25 test files, 159 tests green; reviewer-core unchanged (23 tests).
 
 ### 2026-06-28
 - Built Blast Radius `blast/` module (L04), zero LLM cost: `GET /pulls/:id/blast` reads `repoIntel.getBlastRadius` (facade only), groups callers by `viaSymbol` into a per-symbol tree, attributes endpoints/crons via `factsByFile`, derives ok/empty/degraded state, never throws. `BlastMap*` contract added lock-step in both vendor copies (named `BlastMap*` to avoid clashing with `brief.ts`'s `BlastRadius`/`BlastCaller`/`ChangedSymbol`).

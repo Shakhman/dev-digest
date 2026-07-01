@@ -260,6 +260,14 @@ export const SpecFile = z.object({
   content: z.string().nullish(),
   size: z.number().int().nullish(),
   updated_at: z.string().nullish(),
+  /** Which configured root folder this file was found under (e.g. 'specs', 'docs', 'insights'). */
+  source: z.string().nullish(),
+  /** Approximate token count for this document (using the server-side tokenizer, AC-21). */
+  tokens: z.number().int().nullish(),
+  /** How many agents (in the workspace) have this document in their effective context (AC-24). */
+  used_by_agents: z.number().int().nullish(),
+  /** True when the stored path no longer exists in the clone (file deleted/renamed, AC-9). */
+  missing: z.boolean().default(false),
 });
 export type SpecFile = z.infer<typeof SpecFile>;
 

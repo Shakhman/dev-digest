@@ -19,6 +19,7 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 | [api-contract-review](api-contract-review/SKILL.md) | Review | API contract review — breaking changes, response-schema drift, semver labeling, deprecation policy (companion rule files per concern) |
 | [mermaid-diagram](mermaid-diagram/SKILL.md) | Shared | Mermaid diagrams in markdown (flowcharts, sequence, ERD, …) |
 | [engineering-insights](engineering-insights/SKILL.md) | Meta | Capture non-obvious findings into the touched module's INSIGHTS.md (read-first, dedup, append-only, fixed sections) |
+| [workflow-retro](workflow-retro/SKILL.md) | Meta | Deterministic post-mortem of a multi-agent run — tokens per session, agents & launch order, parallelism, per-agent tool/health signals; appends a ledger row to `docs/retros/ledger.md`. **Manual only — invoke via `/workflow-retro`** |
 | [pr-self-review](pr-self-review/SKILL.md) | Review | Pre-PR gate — runs cheap deterministic checks (tsc, lint, dependency-cruiser, tests), routes the diff through architecture/quality skills per file bucket, and blocks the push on any verified CRITICAL |
 
 ## What Are Skills?

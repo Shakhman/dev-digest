@@ -270,6 +270,30 @@ export interface AuthProvider {
   currentWorkspace(req: unknown): Promise<AuthWorkspace>;
 }
 
+// ---------- FsDocs (clone-root-confined Markdown filesystem) ----------
+
+/**
+ * Filesystem port for Project Context discovery and reading.
+ * Implementations must confine every access to the clone root — no path
+ * traversal, no symlink escape, no symlink cycles (AC-1, AC-12, security).
+ */
+export interface FsDocs {
+  /**
+   * Walk the configured `roots` under `rootPath`, returning repo-relative paths
+   * of every `.md` file found. Returns [] when rootPath does not exist.
+   * Never follows symlinks outside rootPath; cycle-safe; skips `.git` /
+   * `node_modules`.
+   */
+  walkMarkdown(rootPath: string, roots: string[]): Promise<{ path: string }[]>;
+
+  /**
+   * Read `relPath` (repo-relative) inside `rootPath`. Returns `null` when the
+   * file is missing, unreadable, is an absolute path, contains `..`, or resolves
+   * via symlink to a path outside the clone root.
+   */
+  readWithinRoot(rootPath: string, relPath: string): Promise<string | null>;
+}
+
 // ---------- Secrets (pluggable; MVP = LocalSecretsProvider) ----------
 export type SecretKey =
   | 'OPENAI_API_KEY'

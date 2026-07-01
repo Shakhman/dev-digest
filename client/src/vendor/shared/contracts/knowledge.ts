@@ -233,3 +233,56 @@ export const AgentSkillLink = z.object({
   order: z.number().int(),
 });
 export type AgentSkillLink = z.infer<typeof AgentSkillLink>;
+
+// The immutable config snapshot captured in `agent_versions` whenever an agent's
+// config changes (everything but `enabled`). Mirrors the shape written by the
+// agents repository — provider/model/prompt/output_schema/strategy/gate/repo_intel
+// plus the ordered skill ids linked at snapshot time. Used for reproducibility
+// (eval replays a past version) and for surfacing an agent's edit history.
+export const AgentVersionConfig = z.object({
+  provider: Provider,
+  model: z.string(),
+  system_prompt: z.string(),
+  output_schema: z.unknown().nullish(),
+  strategy: ReviewStrategy,
+  ci_fail_on: CiFailOn,
+  repo_intel: z.boolean(),
+  skills: z.array(z.string()),
+  /** Ordered list of repo-relative Markdown paths attached to this agent version (AC-19). */
+  context_docs: z.array(z.string()).default([]),
+});
+export type AgentVersionConfig = z.infer<typeof AgentVersionConfig>;
+
+export const AgentVersion = z.object({
+  agent_id: z.string(),
+  version: z.number().int(),
+  config: AgentVersionConfig,
+  created_at: z.string(),
+});
+export type AgentVersion = z.infer<typeof AgentVersion>;
+
+/**
+ * One persisted link between an agent/skill and an attached context document path.
+ * Used for GET/PUT …/context-docs responses (T-B3).
+ */
+export const ContextDocLink = z.object({
+  path: z.string(),
+  order: z.number().int(),
+  /** True when the stored path no longer exists in the current clone (AC-9). */
+  missing: z.boolean().default(false),
+});
+export type ContextDocLink = z.infer<typeof ContextDocLink>;
+
+/**
+ * One entry in the resolved effective-context set (agent own docs + skill-inherited
+ * docs, deduped in AC-11 order). Used by GET …/effective-context (T-B3).
+ */
+export const EffectiveContextDoc = z.object({
+  path: z.string(),
+  order: z.number().int(),
+  /** Which configured root folder this file was found under (e.g. 'specs', 'docs', 'insights'). */
+  source: z.string().nullish(),
+  /** Approximate token count (AC-21). */
+  tokens: z.number().int().nullish(),
+});
+export type EffectiveContextDoc = z.infer<typeof EffectiveContextDoc>;

@@ -10,12 +10,42 @@ body. Claude Code loads them from this folder at startup and uses the
 | Agent | Model | Tools | Role |
 |---|---|---|---|
 | [researcher](#researcher) | sonnet | Read-only + Web | Find information; never writes |
-| [planner](#planner) | opus | Read-only (no Write/Edit) | Produce a Development Plan |
-| [implementer](#implementer) | sonnet | Full + Skill (worktree) | Write code, pass existing tests |
+| [implementation-planner](#implementation-planner) | opus | Read-only (no Write/Edit) | Review requirements, then produce an Implementation Plan |
+| [implementer](#implementer) | sonnet | Full + Skill | Write code, pass existing tests |
 | [test-writer](#test-writer) | sonnet | Full + Skill | Write UI + backend tests; typological philosophy |
-| [architecture-reviewer](#architecture-reviewer) | opus | Read-only + Web + Skill | Macro architectural review; never writes |
-| [plan-verifier](#plan-verifier) | opus | Read-only + Skill | Requirements-coverage gate against a Development Plan |
+| [architecture-reviewer](#architecture-reviewer) | sonnet | Read-only + Web + Skill | Macro architectural review; never writes |
+| [plan-verifier](#plan-verifier) | sonnet | Read-only + Skill | Requirements-coverage gate against an Implementation Plan |
 | [doc-writer](#doc-writer) | sonnet | Full + Skill | Document features/plans as Diátaxis-typed docs with diagrams |
+
+---
+
+## Pipeline — Spec-Driven Development flow
+
+These agents chain into one SDD pipeline. Canonical order:
+
+1. **spec-creator** → writes the spec (WHAT/WHY, EARS acceptance criteria).
+   *Human approves the spec* — resolve every `[NEEDS CLARIFICATION]` and promote
+   it past `draft` before planning.
+2. **implementation-planner** → turns the approved spec into an Implementation
+   Plan (the HOW): names files, interfaces, and the skills each task needs. Does
+   **not** run tests/build — it only names the verification commands.
+3. **implementer** (multi-agent: one backend slice + one UI slice) → writes the
+   code and makes existing tests pass. Edits land directly on the active branch
+   (no worktree isolation).
+4. **architecture-reviewer** → macro structural review. Run it *before* tests so
+   any restructuring happens before tests are written against the shape. Fix
+   findings, then continue.
+5. **test-writer** → writes the new feature tests (one happy path + the edge that
+   matters).
+6. **plan-verifier** → coverage gate. Runs *after* test-writer because it needs
+   the tests as evidence. FAILs on any Missing required item.
+7. **pr-self-review** (skill, not an agent) → final correctness/quality gate
+   before pushing: runs typecheck/tests/lint/dependency-cruiser and BLOCKS on any
+   verified CRITICAL. This is the bug net — architecture-reviewer and
+   plan-verifier do **not** catch logic bugs.
+
+`architecture-reviewer` is structural only; `plan-verifier` is coverage only.
+Neither finds correctness bugs — that is `pr-self-review`'s job (step 7).
 
 ---
 
@@ -41,22 +71,28 @@ review code.
 
 ---
 
-## planner
+## implementation-planner
 
-**File:** `planner.md`
+**File:** `implementation-planner.md`
 
-Turns a feature request into a self-contained **Development Plan** (9-section
-markdown) that a separate implementer can execute in a fresh session. Read-only
-by tool scoping (no Write/Edit) — it is structurally incapable of writing code.
+Turns **already-defined requirements** into a self-contained **Implementation
+Plan** (10-section markdown) that a separate implementer can execute in a fresh
+session. Plans the *how*, not the *what/why* — it does **not** author or own the
+specification. Read-only by tool scoping (no Write/Edit) — it is structurally
+incapable of writing code.
+
+Before planning it (1) **reviews the requirements** it is given — flags gaps and
+ambiguity, asks up to 3 clarifying questions, and recommends improvements (it
+recommends, never rewrites the spec); and (2) **confirms the execution mode** with
+the user — multi-agent (parallel backend/UI slices) or single-agent (one ordered
+task list) — and shapes the plan's structure accordingly.
 
 Knows all 10 DevDigest server modules, reads the relevant package `INSIGHTS.md`
 and `AGENTS.md` before planning, references the full skill catalog, and tags each
 backend/UI task with the exact skills the implementer must apply. Outputs the
 plan as markdown; the caller persists it to `docs/plans/<feature>.md`.
 
-**Interview mode on** — asks up to 3 clarifying questions before producing a plan.
-
-**Skills (full catalog — planner must apply all best practices when planning):**
+**Skills (full catalog — the planner must apply all best practices when planning):**
 
 | Skill | Purpose in planning |
 |---|---|
@@ -79,10 +115,10 @@ plan as markdown; the caller persists it to `docs/plans/<feature>.md`.
 - Anthropic's canonical Explore → Plan → Implement → Commit workflow and the
   principle that "the planner should be read-only by tool scoping, not prose
   instruction" ([Best practices for Claude Code](https://code.claude.com/docs/en/best-practices))
-- The built-in Plan subagent design (read-only, returns a spec, no code)
+- The built-in Plan subagent design (read-only, returns a plan, no code)
   ([Create custom subagents](https://code.claude.com/docs/en/sub-agents))
-- Spec completeness criteria: "name the files and interfaces, state what is out
-  of scope, end with an end-to-end verification step"
+- Implementation-plan completeness criteria: "name the files and interfaces, state
+  what is out of scope, end with an end-to-end verification step"
   ([Best practices for Claude Code](https://code.claude.com/docs/en/best-practices))
 - "Each subagent needs an objective, an output format, tool guidance, and clear
   task boundaries"
@@ -94,9 +130,10 @@ plan as markdown; the caller persists it to `docs/plans/<feature>.md`.
 
 **File:** `implementer.md`
 
-Executes one non-overlapping slice of a Development Plan. Designed to run in
-parallel (one backend instance, one UI instance) in isolated git worktrees
-(`isolation: worktree`). Applies the correct skill bucket for its domain — backend
+Executes one non-overlapping slice of an Implementation Plan. Designed to run in
+parallel (one backend instance, one UI instance) on disjoint file sets — edits
+land directly on the active branch, no worktree isolation. Applies the correct
+skill bucket for its domain — backend
 skills for `server/` + `reviewer-core/`, UI skills for `client/` — loaded
 contextually via the Skill tool so the two skill sets don't cross-pollute.
 
@@ -137,8 +174,9 @@ Does not do architecture design or full repo review.
 - Orchestrator–worker pattern and "give it a verifiable check it can run; iterate
   until green"
   ([Building effective agents](https://www.anthropic.com/engineering/building-effective-agents))
-- `isolation: worktree` for parallel coders: "isolated git checkouts so edits
-  don't collide"
+- Non-overlapping backend/UI slices let two implementers run in parallel without
+  worktree isolation — they edit disjoint file sets, so changes land directly on
+  the active branch
   ([Create custom subagents](https://code.claude.com/docs/en/sub-agents))
 - Non-overlapping task boundaries: "without detailed task boundaries, agents
   duplicate work or leave gaps"
@@ -237,7 +275,7 @@ No `Write` or `Edit` — structurally read-only.
 
 **File:** `plan-verifier.md`
 
-Given a **Development Plan**, verifies the code already written against every
+Given an **Implementation Plan**, verifies the code already written against every
 task and "Done when" criterion. Counterpart to `pr-self-review`: that gate
 checks quality; this one checks *did we build what the plan said*.
 
@@ -270,7 +308,7 @@ criterion).
 
 Documents functionality that already exists. Three modes:
 1. **Feature mode** — reads the code and produces documentation for a feature.
-2. **Plan-to-doc mode** — converts a Development Plan into architecture/design docs.
+2. **Plan-to-doc mode** — converts an Implementation Plan into architecture/design docs.
 3. **Material-to-doc mode** — converts arbitrary material (notes, specs, conversation)
    into structured documentation.
 

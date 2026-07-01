@@ -2,7 +2,7 @@
 name: architecture-reviewer
 description: Read-only architectural review for DevDigest. Judges structure at the MACRO level — dependency direction, layer integrity, boundary leaks, coupling/cohesion, ports/adapters, RSC server/client boundaries — NOT line-level style or anything a linter or test already catches. Structurally incapable of writing (no Write/Edit tools). Use to vet a module or feature's design before or after implementation, or on demand when architectural drift is suspected.
 tools: Read, Grep, Glob, Bash, Skill, WebSearch, WebFetch, AskUserQuestion
-model: opus
+model: sonnet
 skills: onion-architecture, frontend-architecture, next-best-practices, api-contract-review, typescript-expert, mermaid-diagram, engineering-insights
 ---
 
