@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { Icon } from "@devdigest/ui";
 import type { SmartDiffFile, FindingRecord } from "@devdigest/shared";
 import { parsePatch } from "@/components/diff-viewer/helpers";
@@ -16,6 +17,10 @@ export interface SmartDiffFileRowProps {
   isFirst?: boolean;
   repoFullName: string | null;
   headSha: string | null;
+  /** Triggers generation of THIS file's summary (per-file trigger UX). */
+  onGenerate: (path: string) => void;
+  /** The single path currently generating, or `null` when idle. */
+  generatingPath: string | null;
 }
 
 export function SmartDiffFileRow({
@@ -27,8 +32,13 @@ export function SmartDiffFileRow({
   isFirst,
   repoFullName,
   headSha,
+  onGenerate,
+  generatingPath,
 }: SmartDiffFileRowProps) {
+  const t = useTranslations("prReview");
   const [expanded, setExpanded] = React.useState(defaultExpanded);
+  const isGeneratingThis = generatingPath === file.path;
+  const canGenerate = patch != null;
 
   // Build a map from new line number → findings at that line
   const findingsByLine = React.useMemo(() => {
@@ -74,11 +84,26 @@ export function SmartDiffFileRow({
           )}
         </div>
 
-        {file.pseudocode_summary != null && (
-          <span style={s.summaryBadge} title={file.pseudocode_summary}>
-            % {file.pseudocode_summary}
-          </span>
-        )}
+        <button
+          type="button"
+          style={{
+            ...s.summaryButton,
+            ...(!canGenerate || isGeneratingThis ? s.summaryButtonDisabled : {}),
+          }}
+          disabled={!canGenerate || isGeneratingThis}
+          onClick={(e) => {
+            // Don't also toggle row expand/collapse (mirrors `findingDot`'s handler).
+            e.stopPropagation();
+            onGenerate(file.path);
+          }}
+        >
+          {isGeneratingThis ? (
+            <Icon.RefreshCw size={11} style={{ animation: "ddspin 1s linear infinite" }} />
+          ) : (
+            <Icon.Sparkles size={11} />
+          )}
+          {isGeneratingThis ? t("smartDiff.generatingSummary") : t("smartDiff.summary")}
+        </button>
 
         <span style={s.fileStat}>
           <span style={s.addText}>+{file.additions}</span>
@@ -91,8 +116,11 @@ export function SmartDiffFileRow({
         <div style={s.fileBody}>
           {file.pseudocode_summary != null && (
             <div style={s.pseudoRow}>
-              <span style={s.pseudoLabel}>What this does: </span>
-              {file.pseudocode_summary}
+              <span style={s.pseudoLabelWrap}>
+                <Icon.Sparkles size={12} style={{ color: "var(--accent)" }} />
+                <span style={s.pseudoLabel}>What this does:</span>
+              </span>
+              <span>{file.pseudocode_summary}</span>
             </div>
           )}
 

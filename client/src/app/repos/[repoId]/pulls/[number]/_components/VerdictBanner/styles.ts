@@ -47,4 +47,14 @@ export const s = {
     color: "var(--text-muted)",
     letterSpacing: "0.04em",
   } satisfies CSSProperties,
+  costText: {
+    fontSize: 11,
+    color: "var(--text-muted)",
+    letterSpacing: "0.02em",
+    textAlign: "center",
+  } satisfies CSSProperties,
+  regenerateBtn: {
+    marginLeft: "auto",
+    border: "none",
+  } satisfies CSSProperties,
 } as const;

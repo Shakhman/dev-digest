@@ -151,7 +151,10 @@ export function ContextTab({ agentId }: ContextTabProps) {
                 <input
                   type="checkbox"
                   checked={true}
-                  onChange={() => toggleAttach(path)}
+                  onChange={() => {
+                    if (isMissing && !window.confirm(`"${baseName}" doesn't exist in the current repo.\n\nRemoving it will permanently delete this link — it won't come back on refresh. Continue?`)) return;
+                    toggleAttach(path);
+                  }}
                   style={{ cursor: "pointer", flexShrink: 0 }}
                 />
                 <span style={{ flex: 1, fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>

@@ -78,24 +78,34 @@ export interface ProjectContextFacade {
     clonePath: string;
     budget: number;
   }): Promise<ProjectContextResult>;
+
+  /**
+   * Workspace-DEFAULT context resolution (SPEC-09 T-B2): the baseline
+   * discovered doc set under the clone's configured roots, trimmed to
+   * `budget` — applies NO agent/skill `context_docs` overrides. Used by
+   * features (the `brief` aggregator) that aren't tied to any particular
+   * agent/skill config, so they get the same baseline context regardless of
+   * workspace agent setup. Degrades to an empty result (never throws) when
+   * there is no clone / no docs / a filesystem error.
+   */
+  resolveWorkspaceDefault(params: { clonePath: string; budget: number }): Promise<ProjectContextResult>;
 }
 
 /** Build the default (non-injected) ProjectContextFacade implementation. */
 function buildProjectContextFacade(container: Container): ProjectContextFacade {
   const repo = new ProjectContextRepository(container.db);
 
-  async function resolveAndRead({
-    agentPaths,
-    skillGroups,
-    clonePath,
-    budget,
-  }: {
-    agentPaths: { path: string; order: number }[];
-    skillGroups: { paths: { path: string; order: number }[] }[];
-    clonePath: string;
-    budget: number;
-  }): Promise<ProjectContextResult> {
-    const orderedPaths = resolveOrder({ agentPaths, skillGroups });
+  /**
+   * Read an ordered list of repo-relative doc paths from `clonePath`, count
+   * tokens, and admit them to `budget`. Shared by `resolveAndRead` (explicit
+   * agent/skill path lists) and `resolveWorkspaceDefault` (discovered
+   * baseline set, T-B2) so the read + budget behaviour stays identical.
+   */
+  async function readPathsWithinBudget(
+    orderedPaths: string[],
+    clonePath: string,
+    budget: number,
+  ): Promise<ProjectContextResult> {
     const docs: { path: string; content: string; tokens: number }[] = [];
     const omitted: string[] = [];
 
@@ -119,6 +129,23 @@ function buildProjectContextFacade(container: Container): ProjectContextFacade {
     };
   }
 
+  async function resolveAndRead({
+    agentPaths,
+    skillGroups,
+    clonePath,
+    budget,
+  }: {
+    agentPaths: { path: string; order: number }[];
+    skillGroups: { paths: { path: string; order: number }[] }[];
+    clonePath: string;
+    budget: number;
+  }): Promise<ProjectContextResult> {
+    const orderedPaths = resolveOrder({ agentPaths, skillGroups });
+    return readPathsWithinBudget(orderedPaths, clonePath, budget);
+  }
+
+  const EMPTY_RESULT: ProjectContextResult = { contents: [], read: [], omitted: [], truncated: [] };
+
   return {
     resolveAndRead,
 
@@ -130,6 +157,21 @@ function buildProjectContextFacade(container: Container): ProjectContextFacade {
         skillGroups.push({ paths });
       }
       return resolveAndRead({ agentPaths, skillGroups, clonePath, budget });
+    },
+
+    async resolveWorkspaceDefault({ clonePath, budget }) {
+      try {
+        const roots = container.config.contextRoots;
+        const walked = await container.fsDocs.walkMarkdown(clonePath, roots);
+        if (walked.length === 0) return EMPTY_RESULT;
+
+        // Baseline order: discovery order (no agent/skill overrides to apply).
+        const orderedPaths = walked.map((w) => w.path);
+        return await readPathsWithinBudget(orderedPaths, clonePath, budget);
+      } catch {
+        // No clone / fs error — degrade to empty, never throw (Non-goal AC-14).
+        return EMPTY_RESULT;
+      }
     },
   };
 }

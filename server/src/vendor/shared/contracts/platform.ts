@@ -18,6 +18,7 @@ export const FeatureModelId = z.enum([
   'risk_brief',
   'conformance',
   'conventions',
+  'smart_diff_summary',
 ]);
 export type FeatureModelId = z.infer<typeof FeatureModelId>;
 
@@ -79,6 +80,16 @@ export const FEATURE_MODELS: FeatureModelDef[] = [
     // structured output. DeepSeek models don't reliably honor strict mode on
     // OpenRouter, so they fail parse-with-repair and throw "schema validation
     // failed". OpenAI models via OpenRouter support strict outputs.
+    defaultProvider: 'openrouter',
+    defaultModel: 'openai/gpt-4.1-mini',
+  },
+  {
+    id: 'smart_diff_summary',
+    label: 'Smart Diff · File Summaries',
+    description: 'Writes a one-line "what this file does" per changed file.',
+    // Same reasoning as `conventions`: OpenRouter (BYO key covers it) + an
+    // OpenAI-family model, since DeepSeek models don't reliably honor strict
+    // json_schema structured output on OpenRouter (see server/INSIGHTS.md).
     defaultProvider: 'openrouter',
     defaultModel: 'openai/gpt-4.1-mini',
   },

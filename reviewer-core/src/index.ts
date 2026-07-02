@@ -61,3 +61,28 @@ export { OpenRouterProvider, type OpenRouterProviderOptions } from './llm/openro
 // Intent extraction — pure LLM call that derives PR intent, scope, and risk
 // areas from the diff (+ optional description / linked issue / plan docs).
 export { extractIntent } from './intent/extractor.js';
+
+// Why+Risk Brief (SPEC-09) — pure prompt-builder + trim (NO I/O, tokenizer
+// injected). The server assembles inputs and makes the one structured call.
+export {
+  buildBriefPrompt,
+  type BriefPromptInputs,
+  type BriefIntentInput,
+  type BriefBlastSummaryInput,
+  type BriefBlastTopSymbol,
+  type BriefSmartDiffInput,
+  type BriefSmartDiffGroupInput,
+  type BriefTokenizer,
+  type BriefPromptSection,
+  type BuildBriefPromptResult,
+} from './brief/prompt.js';
+
+// Smart Diff `pseudocode_summary` generation — pure prompt-builder + trim
+// (NO I/O, tokenizer injected). The server assembles inputs (changed-file
+// patches) and makes the one batched structured call.
+export {
+  buildDiffSummaryPrompt,
+  type DiffSummaryFileInput,
+  type DiffSummaryPromptInputs,
+  type BuildDiffSummaryPromptResult,
+} from './diff-summary/prompt.js';

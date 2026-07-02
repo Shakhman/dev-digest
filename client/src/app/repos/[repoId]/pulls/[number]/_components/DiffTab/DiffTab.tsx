@@ -95,6 +95,7 @@ export function DiffTab({ prId, filesCount, files, canComment, reviews, onFindin
           onFindingClick={onFindingClick}
           repoFullName={repoFullName}
           headSha={headSha}
+          prId={prId}
         />
       ) : (
         <DiffViewer files={files} commenting={commenting} />

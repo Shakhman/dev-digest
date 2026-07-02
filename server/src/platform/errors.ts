@@ -34,6 +34,15 @@ export class ExternalServiceError extends AppError {
   }
 }
 
+/** A request conflicts with in-progress state (e.g. a concurrent generation
+ *  already holding the per-PR brief lock, SPEC-09 AC-16). Retryable by the
+ *  client after the in-flight request completes. */
+export class ConflictError extends AppError {
+  constructor(message = 'Conflict', details?: unknown) {
+    super('conflict', message, 409, details);
+  }
+}
+
 export class ConfigError extends AppError {
   constructor(message: string, details?: unknown) {
     super('config_error', message, 500, details);

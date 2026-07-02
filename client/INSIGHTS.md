@@ -6,6 +6,8 @@ so the next agent/session doesn't relearn it. Append-only — see the
 
 ## What Works
 
+- **2026-07-02** — `parseFileRef` + `githubBlobUrl` (`lib/github-urls.ts`) already handle the `path:line` and `path:start-end` suffix format used in `brief.risks[].file_refs` and `review_focus[]`. No custom string-splitting needed — always reach for these two helpers first when turning a file-ref string into a GitHub blob deep-link. Evidence: `client/src/lib/github-urls.ts:57-61`, `IntentCard.tsx` `RiskRow`.
+
 - **2026-06-14** — `formatCost` (`src/lib/cost.ts`) distinguishes MISSING data (`null`/`undefined` → "—") from a genuine zero (`0` → "$0.00"), widens precision for sub-cent values (~2 sig figs), and trims trailing zeros to a 2dp floor ("$0.06" not "$0.060", "$0.0013" not "$0.00"). Reuse it for any per-run money display.
 
 ## What Doesn't Work
@@ -43,6 +45,8 @@ so the next agent/session doesn't relearn it. Append-only — see the
 
 ## Recurring Errors & Fixes
 
+- **2026-07-02** — After a partial `git restore` that removes a prop from a component, any caller that still passes that prop causes a TS compile error Next.js surfaces as a **silent render failure** (stale page with no error banner visible to the user). Always check all JSX call sites when a component's prop interface changes — `grep` for the component name across `_components/` before declaring the revert done. Evidence: `OverviewTab.tsx` passing `prId` to `IntentCard` after `IntentCard` was restored to a version that didn't accept it.
+
 - **2026-06-23** — React warning "Updating a style property during rerender (`borderColor`) when a conflicting property is set (`borderLeftColor`) will act like the singular property is temporarily set to `null`" fires when a component toggles between **shorthand** (`borderColor`, `borderWidth`) and **longhand** (`borderLeftColor`, `borderLeftWidth`) properties on the same rerender. Fix: replace all shorthands with per-side longhands (`borderTopColor`, `borderRightColor`, `borderBottomColor`, `borderLeftColor` / `…Width`) — never mix the two in the same style object across conditional branches. Evidence: `client/src/app/repos/[repoId]/pulls/[number]/_components/FindingCard/styles.ts`.
 
 - **2026-06-30** — Changing a contract field from a primitive (`string`) to an object (`{path,tokens}`) breaks any JSX that renders the field as a direct child (`{sp}` where `sp` was a string). TypeScript catches it as `Type '{ path: string; tokens: number }' is not assignable to type 'ReactNode'`. Fix: update the render site to use `sp.path`. When doing a lock-step breaking contract change, grep for ALL JSX render sites of the changed field — not just the type file. Evidence: `client/src/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/_components/TraceBody/TraceBody.tsx:46`.
@@ -52,6 +56,12 @@ so the next agent/session doesn't relearn it. Append-only — see the
 - **2026-07-01** — A local barrel `index.ts` re-export using the CLAUDE.md-documented ESM convention ("relative imports carry the `.js` extension") breaks Next.js webpack module resolution in dev — `export { ContextTab } from "./ContextTab.js"` gave `Module not found: Can't resolve './ContextTab.js'` and 500'd **every** route in the app (not just the owning page), because a webpack compile error persists across the whole dev server until fixed. Every other client barrel file omits the extension (`from "./ContextFileList"`, `from "./ConfigTab"`, etc.) — the `.js`-extension convention holds for the server's Node-ESM runtime but not for client barrel files under Next's bundler. RTL/Vitest tests don't catch this (different module resolver than webpack); only an actual `next dev` page load surfaces it. Fix: omit the extension in client `index.ts` barrels. Evidence: `client/src/app/agents/[id]/_components/AgentEditor/_components/ContextTab/index.ts`, `client/src/app/skills/[id]/_components/SkillEditor/_components/ContextTab/index.ts`.
 
 ## Session Notes
+
+### 2026-07-01 (Why+Risk Brief, T-U1/T-U2/T-U3)
+- Built the PR BRIEF card (SPEC-09): `useBrief` hook (`lib/hooks/brief.ts`, mirrors `useIntent` — 404 is pre-generation, not an error; `generate()` mutation covers both first-generate and regenerate via the same `POST /pulls/:id/brief`, `onSuccess` writes straight into the `["pr-brief", prId]` query cache). `BriefCard` component tree rendered full-width at the top of `OverviewTab`, above the existing Intent/Blast `s.twoCol` row (both are top-level Fragment children flattened into the page's `gap:24` flex column, so no extra margin was needed for spacing).
+- **Reused `VerdictBanner` (from `_components/VerdictBanner`) to compose score/verdict/finding-counts (AC-4a) instead of hand-rolling a second verdict-color/score-ring renderer** — passed `summary={null}` so it renders only the icon/label/badge-counts/score-ring row and skips its own `<p>{review.summary}</p>`, since that slot would otherwise duplicate the brief's own `why` narrative rendered separately below it. Guarded on `latestReview?.verdict` (a review can exist with `kind:'summary'` and null verdict) so the row is omitted rather than fabricating a verdict. Evidence: `client/src/app/repos/[repoId]/pulls/[number]/_components/BriefCard/BriefCard.tsx`, `.../VerdictBanner/VerdictBanner.tsx`.
+- Risk severity → colour mapping reuses the same `--crit`/`--warn`/`--ok` (+ `-bg`) tokens `VerdictBanner`'s `VERDICT_META` uses (not the `--warning-text`/`--warning-bg` fallback pair `BlastCard`/`IntentCard` use) — both pairs exist in `styles.css`; `--crit`/`--warn`/`--ok` are the ones with no inline fallback needed since they're always defined.
+- `usePrReviews` reviews arrive newest-first per the existing `page.tsx` comment ("Reviews come newest-first") — `reviews?.[0]` is the latest without re-sorting.
 
 ### 2026-06-30
 - Implemented T-U0 shared pre-work for SPEC-08 Project Context: updated client vendor copies of `trace.ts` (`specs_read` → `{path,tokens}[]`), `platform.ts` (`SpecFile` extended), `knowledge.ts` (`AgentVersionConfig.context_docs`, `ContextDocLink`, `EffectiveContextDoc` — also added missing `AgentVersionConfig`/`AgentVersion` to client copy). Fixed `TraceBody.tsx` to render `sp.path` instead of `sp` directly after the shape change.
@@ -78,5 +88,10 @@ so the next agent/session doesn't relearn it. Append-only — see the
 ### 2026-06-18
 - Built Skills UI (L02): `lib/hooks/skills.ts`, `/skills` page + SkillsListView + SkillCard + ImportDrawer, `/skills/[id]` + SkillEditor with Config/Preview/Versions/Stats tabs, AgentEditor SkillsTab (HTML5 DnD reorder, checkbox link/unlink), nav SKILLS LAB section, i18n keys.
 - Skills tab added to AgentEditor — both `constants.ts` (TABS) and `page.tsx` (VALID_TABS) updated.
+
+### 2026-07-02 (IntentCard Risk Areas row design)
+- Implemented collapsible `RiskRow` list for `brief.risks[]` in `IntentCard`: kind+title text classified → icon via `getKindIcon` regex table (`constants.ts`), severity → colour via `SEVERITY_COLOR`, file ref wrapped in `<a>` to `githubBlobUrl`. Falls back to plain `intent.risk_areas` Badge chips when no brief exists.
+- Threaded `repoFullName` + `headSha` from `OverviewTab` → `IntentCard` → `RiskRow` for deep-link construction (same pattern as `BlastCard` / `SmartDiffFileRow`).
+- `e.stopPropagation()` on the `<a>` is required: without it clicking the link also fires the row's `<button onClick>` and toggles the expanded state. Evidence: `IntentCard.tsx` `RiskRow`.
 
 ## Open Questions

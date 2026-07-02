@@ -3,9 +3,6 @@ import {
   Review,
   Finding,
   Intent,
-  BlastRadius,
-  Risks,
-  PrHistory,
   SmartDiff,
   Conformance,
   Onboarding,
@@ -65,42 +62,9 @@ describe('AI contracts parse fixtures', () => {
     expect(f.trifecta_components).toContain('exfil_path');
   });
 
-  it('Intent / BlastRadius / Risks / PrHistory', () => {
+  it('Intent', () => {
     expect(() =>
       Intent.parse({ intent: 'x', in_scope: ['a'], out_of_scope: ['b'] }),
-    ).not.toThrow();
-    expect(() =>
-      BlastRadius.parse({
-        changed_symbols: [{ name: 'rateLimit', file: 'a.ts', kind: 'function' }],
-        downstream: [
-          {
-            symbol: 'rateLimit',
-            callers: [{ name: 'publicRouter', file: 'b.ts', line: 23 }],
-            endpoints_affected: ['GET /x'],
-            crons_affected: ['c'],
-          },
-        ],
-        summary: 's',
-      }),
-    ).not.toThrow();
-    expect(() =>
-      Risks.parse({
-        risks: [{ kind: 'security', title: 't', explanation: 'e', severity: 'high', file_refs: [] }],
-      }),
-    ).not.toThrow();
-    expect(() =>
-      PrHistory.parse({
-        history: [
-          {
-            pr_number: 401,
-            title: 't',
-            merged_at: '2026-03-18',
-            author: 'a',
-            files_overlap: [],
-            notes: 'n',
-          },
-        ],
-      }),
     ).not.toThrow();
   });
 

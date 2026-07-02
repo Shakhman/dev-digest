@@ -34,6 +34,8 @@ export type {
 } from "@devdigest/shared";
 
 export type { Review, Finding, Severity, Verdict } from "@devdigest/shared";
+// PrBrief (SPEC-09 Why+Risk Brief): flat `{ what, why, risk_level, risks[],
+// review_focus[] }`, not the old composed `{ intent, blast, risks, history }`.
 export type { PrBrief, SmartDiff } from "@devdigest/shared";
 
 /** UI-only view model for a PR list row (derives display fields from PrMeta). */
