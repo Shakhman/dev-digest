@@ -4,8 +4,10 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Icon, Badge, CircularScore } from "@devdigest/ui";
+import { Icon, Badge, CircularScore, Button } from "@devdigest/ui";
 import type { Verdict } from "@devdigest/shared";
+import { formatCost } from "@/lib/cost";
+import type { BriefCost } from "@/lib/hooks/brief";
 import { VERDICT_META } from "./constants";
 import { s } from "./styles";
 
@@ -15,14 +17,18 @@ export function VerdictBanner({
   score,
   findingsCount,
   blockers,
-  agentName,
+  onRegenerate,
+  isGenerating,
+  cost,
 }: {
   verdict: Verdict;
   summary: string | null;
   score: number | null;
   findingsCount: number;
   blockers: number;
-  agentName?: string | null;
+  onRegenerate?: () => void;
+  isGenerating?: boolean;
+  cost?: BriefCost;
 }) {
   const t = useTranslations("prReview");
   const m = VERDICT_META[verdict] ?? VERDICT_META.comment;
@@ -39,10 +45,16 @@ export function VerdictBanner({
             {t("verdict.findingsCount", { count: findingsCount })}
             {blockers > 0 ? t("verdict.blockers", { count: blockers }) : ""}
           </Badge>
-          {agentName && (
-            <Badge color="var(--accent-text)" bg="var(--accent-bg)" icon="Cpu">
-              {agentName}
-            </Badge>
+          {onRegenerate && (
+            <Button
+              kind="secondary"
+              size="sm"
+              icon="RefreshCw"
+              loading={isGenerating}
+              disabled={isGenerating}
+              onClick={onRegenerate}
+              style={s.regenerateBtn}
+            />
           )}
         </div>
         {summary && <p style={s.summary}>{summary}</p>}
@@ -51,6 +63,11 @@ export function VerdictBanner({
         <div style={s.scoreCol}>
           <CircularScore score={score} size={52} stroke={5} />
           <span style={s.scoreLabel}>{t("verdict.prScore")}</span>
+          {cost && (
+            <span style={s.costText}>
+              {cost.costUsd != null ? formatCost(cost.costUsd) : ""} {cost.tokensIn}→{cost.tokensOut}
+            </span>
+          )}
         </div>
       )}
     </div>

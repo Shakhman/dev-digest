@@ -58,7 +58,9 @@
     "largeBody": "Consider splitting it into smaller, focused PRs for easier review:",
     "filesCount": "{count} files",
     "findingLines": "{count} finding-lines",
-    "groupedByRole": "Smart Diff · grouped by role"
+    "groupedByRole": "Smart Diff · grouped by role",
+    "summary": "Summary",
+    "generatingSummary": "Generating…"
   },
   "list": {
     "breadcrumb": "Pull Requests",
@@ -111,5 +113,24 @@
   },
   "findingsPopover": {
     "header": "{count} findings"
+  },
+  "brief": {
+    "title": "PR Brief",
+    "generate": "Generate Brief",
+    "regenerate": "Regenerate",
+    "generating": "Generating…",
+    "emptyTitle": "No brief yet",
+    "emptyBody": "Generate a short why + risk narrative for this PR from its existing signals.",
+    "errorTitle": "Couldn’t generate the brief",
+    "errorBody": "The model call failed. No brief was cached — try again.",
+    "retry": "Retry",
+    "stale": "Generated for an older commit — regenerate to update",
+    "missingSections": "Some inputs were unavailable when this brief was generated.",
+    "reviewFocusTitle": "Review focus — read these first",
+    "riskLevel": {
+      "high": "High risk",
+      "medium": "Medium risk",
+      "low": "Low risk"
+    }
   }
 }

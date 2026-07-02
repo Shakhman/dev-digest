@@ -191,8 +191,20 @@ export class ReviewRunExecutor {
       // Fetch enabled skills linked to this agent (in order). Their bodies are
       // injected into the prompt as "## Skills / rules" by assemblePrompt.
       const linked = await this.container.agentsRepo.linkedSkills(agent.id);
-      const skillBodies = linked.filter((l) => l.skill.enabled).map((l) => l.skill.body);
+      const enabledLinked = linked.filter((l) => l.skill.enabled);
+      const skillBodies = enabledLinked.map((l) => l.skill.body);
       if (skillBodies.length) runLog.info(`skills: ${skillBodies.length} enabled skill(s) attached`);
+
+      // ---- T-B6: Project Context injection (AC-10/11/12/13/14/15) -----------
+      // Independent of the repoIntel toggle (AC-15). Best-effort: never throws,
+      // never fails the run. Reads agent's own doc paths + paths from enabled
+      // skills; passes ordered contents to reviewPullRequest as `specs`.
+      const { specsContents, specsRead } = await this._resolveProjectContext(
+        agent.id,
+        enabledLinked.map((l) => l.skill.id),
+        repo.clonePath,
+        runLog,
+      );
 
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
@@ -216,6 +228,10 @@ export class ReviewRunExecutor {
         ...(pull.body ? { prDescription: pull.body } : {}),
         task,
         ...(skillBodies.length ? { skills: skillBodies } : {}),
+        // T-B6 — inject Project Context docs (AC-10/12). The existing
+        // assemblePrompt wraps each in `<untrusted source="spec-N">` under
+        // `## Project context` (no reviewer-core change needed, AC-12/13).
+        ...(specsContents.length ? { specs: specsContents } : {}),
         sessionId: `${repo.owner}/${repo.name}#${pull.number}:${agent.name}`,
         onEvent: (e) => runLog.event(e.kind, e.msg, e.data),
         checkCancelled: () => {
@@ -291,7 +307,8 @@ export class ReviewRunExecutor {
         })),
         raw_output: outcome.raw,
         memory_pulled: [],
-        specs_read: [],
+        // T-B6: trace embeds path + token count for each injected doc (AC-16/17).
+        specs_read: specsRead,
         // Persisted log = the run's FULL event buffer (incl. shared pre-work:
         // diff load + intent), not just events recorded inside this method.
         log: runLog.logFor(runId),
@@ -325,6 +342,53 @@ export class ReviewRunExecutor {
         .catch(() => undefined);
       this.container.runBus.complete(runId);
       throw err;
+    }
+  }
+
+  /**
+   * T-B6 — Resolve and read the effective Project Context docs for an agent.
+   *
+   * Delegates to the `container.projectContext` facade (`resolveForRun`),
+   * which fetches the agent's own doc paths + paths from each enabled skill
+   * via `ProjectContextRepository` and handles resolveOrder, readWithinRoot,
+   * admitToBudget internally. Never queries `agentContextDocs`/
+   * `skillContextDocs` directly here — that would duplicate the repository
+   * and bypass the facade.
+   *
+   * Best-effort: any error degrades to empty (AC-14) — never fails the run.
+   * Independent of the repoIntel toggle (AC-15).
+   */
+  private async _resolveProjectContext(
+    agentId: string,
+    enabledSkillIds: string[],
+    clonePath: string | null,
+    runLog: RunLogger,
+  ): Promise<{ specsContents: string[]; specsRead: { path: string; tokens: number }[] }> {
+    const empty = { specsContents: [], specsRead: [] };
+    if (!clonePath) return empty;
+
+    try {
+      const CONTEXT_BUDGET = 8000; // tokens; configurable future work
+      const result = await this.container.projectContext.resolveForRun({
+        agentId,
+        enabledSkillIds,
+        clonePath,
+        budget: CONTEXT_BUDGET,
+      });
+
+      if (result.read.length > 0) {
+        runLog.info(
+          `project context: ${result.read.length} doc(s) injected` +
+            (result.omitted.length ? `; ${result.omitted.length} omitted` : '') +
+            (result.truncated.length ? `; ${result.truncated.length} truncated` : ''),
+        );
+      }
+
+      return { specsContents: result.contents, specsRead: result.read };
+    } catch (err) {
+      // Best-effort: never fail the run because of project context.
+      runLog.info(`project context: degraded — ${(err as Error).message}`);
+      return empty;
     }
   }
 

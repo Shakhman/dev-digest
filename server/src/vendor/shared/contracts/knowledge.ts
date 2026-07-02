@@ -254,8 +254,36 @@ export const AgentVersionConfig = z.object({
   ci_fail_on: CiFailOn,
   repo_intel: z.boolean(),
   skills: z.array(z.string()),
+  /** Ordered list of repo-relative Markdown paths attached to this agent version (AC-19). */
+  context_docs: z.array(z.string()).default([]),
 });
 export type AgentVersionConfig = z.infer<typeof AgentVersionConfig>;
+
+/**
+ * One persisted link between an agent/skill and an attached context document path.
+ * Used for GET/PUT …/context-docs responses (T-B3).
+ */
+export const ContextDocLink = z.object({
+  path: z.string(),
+  order: z.number().int(),
+  /** True when the stored path no longer exists in the current clone (AC-9). */
+  missing: z.boolean().default(false),
+});
+export type ContextDocLink = z.infer<typeof ContextDocLink>;
+
+/**
+ * One entry in the resolved effective-context set (agent own docs + skill-inherited
+ * docs, deduped in AC-11 order). Used by GET …/effective-context (T-B3).
+ */
+export const EffectiveContextDoc = z.object({
+  path: z.string(),
+  order: z.number().int(),
+  /** Which configured root folder this file was found under (e.g. 'specs', 'docs', 'insights'). */
+  source: z.string().nullish(),
+  /** Approximate token count (AC-21). */
+  tokens: z.number().int().nullish(),
+});
+export type EffectiveContextDoc = z.infer<typeof EffectiveContextDoc>;
 
 export const AgentVersion = z.object({
   agent_id: z.string(),

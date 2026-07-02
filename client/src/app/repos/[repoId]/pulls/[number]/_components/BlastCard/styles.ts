@@ -9,6 +9,8 @@ export const s = {
     display: "flex",
     flexDirection: "column",
     gap: 14,
+    minWidth: 0,
+    overflow: "hidden",
   } satisfies CSSProperties,
 
   // Header stat row: "N symbols · N callers · N endpoints · N cron"
@@ -78,11 +80,16 @@ export const s = {
     alignItems: "center",
     gap: 8,
     color: "var(--text-muted)",
+    minWidth: 0,
+    overflow: "hidden",
   } satisfies CSSProperties,
 
   callerNoLink: {
     fontSize: 13,
     color: "var(--text-secondary)",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
   } satisfies CSSProperties,
 
   badgeRow: {

@@ -15,6 +15,10 @@ interface SmartDiffGroupSectionProps {
   onFindingClick: (findingId: string) => void;
   repoFullName: string | null;
   headSha: string | null;
+  /** Triggers per-file summary generation (T-B5/per-file trigger UX). */
+  onGenerate: (path: string) => void;
+  /** The single path currently generating, or `null` when idle. */
+  generatingPath: string | null;
 }
 
 export function SmartDiffGroupSection({
@@ -25,6 +29,8 @@ export function SmartDiffGroupSection({
   onFindingClick,
   repoFullName,
   headSha,
+  onGenerate,
+  generatingPath,
 }: SmartDiffGroupSectionProps) {
   const [expanded, setExpanded] = React.useState(defaultExpanded);
   const meta = ROLE_META[group.role];
@@ -52,6 +58,8 @@ export function SmartDiffGroupSection({
               isFirst={idx === 0}
               repoFullName={repoFullName}
               headSha={headSha}
+              onGenerate={onGenerate}
+              generatingPath={generatingPath}
             />
           ))}
         </div>

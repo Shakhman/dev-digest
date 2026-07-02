@@ -1,8 +1,11 @@
 import { z } from 'zod';
 
 /**
- * PR Brief building blocks: Intent, Blast radius, Risks, PR History,
- * Smart Diff. Composed into PrBrief.
+ * PR Brief (SPEC-09 Why+Risk Brief): a flat, model-written narrative
+ * `{ what, why, risk_level, risks[], review_focus[] }`. `risk_level` is
+ * derived (max severity across `risks[]`), never model-produced. Also hosts
+ * `Intent` and `SmartDiff`, which are separate deterministic signals
+ * consumed alongside the brief (not composed into it).
  */
 
 // ---- Intent ----
@@ -13,36 +16,6 @@ export const Intent = z.object({
   risk_areas: z.array(z.string()).default([]),
 });
 export type Intent = z.infer<typeof Intent>;
-
-// ---- Blast radius ----
-export const ChangedSymbol = z.object({
-  name: z.string(),
-  file: z.string(),
-  kind: z.string(),
-});
-export type ChangedSymbol = z.infer<typeof ChangedSymbol>;
-
-export const BlastCaller = z.object({
-  name: z.string(),
-  file: z.string(),
-  line: z.number().int(),
-});
-export type BlastCaller = z.infer<typeof BlastCaller>;
-
-export const DownstreamImpact = z.object({
-  symbol: z.string(),
-  callers: z.array(BlastCaller),
-  endpoints_affected: z.array(z.string()),
-  crons_affected: z.array(z.string()),
-});
-export type DownstreamImpact = z.infer<typeof DownstreamImpact>;
-
-export const BlastRadius = z.object({
-  changed_symbols: z.array(ChangedSymbol),
-  downstream: z.array(DownstreamImpact),
-  summary: z.string(),
-});
-export type BlastRadius = z.infer<typeof BlastRadius>;
 
 // ---- Risks ----
 export const RiskSeverity = z.enum(['high', 'medium', 'low']);
@@ -56,27 +29,6 @@ export const Risk = z.object({
   file_refs: z.array(z.string()),
 });
 export type Risk = z.infer<typeof Risk>;
-
-export const Risks = z.object({
-  risks: z.array(Risk),
-});
-export type Risks = z.infer<typeof Risks>;
-
-// ---- PR History ----
-export const PrHistoryItem = z.object({
-  pr_number: z.number().int(),
-  title: z.string(),
-  merged_at: z.string(),
-  author: z.string(),
-  files_overlap: z.array(z.string()),
-  notes: z.string(),
-});
-export type PrHistoryItem = z.infer<typeof PrHistoryItem>;
-
-export const PrHistory = z.object({
-  history: z.array(PrHistoryItem),
-});
-export type PrHistory = z.infer<typeof PrHistory>;
 
 // ---- Smart Diff ----
 export const SmartDiffRole = z.enum(['core', 'wiring', 'boilerplate']);
@@ -113,11 +65,33 @@ export const SmartDiff = z.object({
 });
 export type SmartDiff = z.infer<typeof SmartDiff>;
 
-// ---- Composed PR Brief (pr_brief.json) ----
+// ---- PR Brief (pr_brief.json) ----
 export const PrBrief = z.object({
-  intent: Intent,
-  blast: BlastRadius,
-  risks: Risks,
-  history: PrHistory,
+  what: z.string(),
+  why: z.string(),
+  risk_level: RiskSeverity,
+  risks: z.array(Risk),
+  review_focus: z.array(z.string()),
 });
 export type PrBrief = z.infer<typeof PrBrief>;
+
+// ---- Smart Diff file summaries (pr_diff_summary.json) ----
+/**
+ * One model-written "what this file does" line, keyed by the file's exact
+ * `path` as it appears in `pr_files`/`SmartDiffFile` — the client merges this
+ * into `SmartDiffFile.pseudocode_summary` (never a change to the `SmartDiff`
+ * contract itself; `GET /pulls/:id/smart-diff` keeps emitting `null`).
+ */
+export const DiffFileSummary = z.object({ path: z.string(), summary: z.string() });
+export type DiffFileSummary = z.infer<typeof DiffFileSummary>;
+
+export const DiffSummaryResponse = z.object({
+  summaries: z.array(DiffFileSummary),
+  /** True when the recorded generation HEAD differs from the PR's current HEAD. */
+  stale: z.boolean(),
+  /** As reported by the structured call; null when unavailable. */
+  cost_usd: z.number().nullable(),
+  tokens_in: z.number().int().nullable(),
+  tokens_out: z.number().int().nullable(),
+});
+export type DiffSummaryResponse = z.infer<typeof DiffSummaryResponse>;

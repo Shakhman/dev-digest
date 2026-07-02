@@ -60,4 +60,30 @@ export const prBrief = pgTable('pr_brief', {
     .primaryKey()
     .references(() => pullRequests.id, { onDelete: 'cascade' }),
   json: jsonb('json').notNull(),
+  /** PR HEAD SHA this brief was generated for (SPEC-09 staleness signal, AC-18). */
+  generatedHeadSha: text('generated_head_sha'),
+  /** Structured call's reported tokensIn/tokensOut/costUsd (AC-12) — recorded, never recomputed. */
+  tokensIn: integer('tokens_in'),
+  tokensOut: integer('tokens_out'),
+  costUsd: doublePrecision('cost_usd'),
+});
+
+/**
+ * Smart Diff per-file pseudocode summaries cache. Keyed by `pr_id` (NOT
+ * folded into `pr_files`) because `pr_files` is deleted and re-inserted on
+ * every PR detail page load (`modules/pulls/routes.ts`) — a cache on
+ * `pr_files` columns would be silently wiped on the next view. Mirrors
+ * `pr_brief`'s shape family (json blob + generation/staleness + cost/token
+ * metadata, recorded from the structured call, never recomputed).
+ */
+export const prDiffSummary = pgTable('pr_diff_summary', {
+  prId: uuid('pr_id')
+    .primaryKey()
+    .references(() => pullRequests.id, { onDelete: 'cascade' }),
+  /** `{ summaries: { path: string; summary: string }[] }`. */
+  json: jsonb('json').notNull(),
+  generatedHeadSha: text('generated_head_sha'),
+  tokensIn: integer('tokens_in'),
+  tokensOut: integer('tokens_out'),
+  costUsd: doublePrecision('cost_usd'),
 });

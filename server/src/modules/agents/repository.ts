@@ -147,6 +147,16 @@ export class AgentsRepository {
 
   private async snapshotVersion(row: AgentRow, version: number): Promise<void> {
     const skills = await this.skillIdsForAgent(row.id);
+    // Fetch ordered context-doc paths via the DB (T-B5: paths captured in
+    // snapshot for reproducibility — AC-19). Read directly from the link table
+    // (this repository owns both tables; no cross-module import needed).
+    const contextDocRows = await this.db
+      .select({ path: t.agentContextDocs.path, order: t.agentContextDocs.order })
+      .from(t.agentContextDocs)
+      .where(eq(t.agentContextDocs.agentId, row.id))
+      .orderBy(asc(t.agentContextDocs.order));
+    const context_docs = contextDocRows.map((r) => r.path);
+
     await this.db
       .insert(t.agentVersions)
       .values({
@@ -161,9 +171,62 @@ export class AgentsRepository {
           ci_fail_on: row.ciFailOn,
           repo_intel: row.repoIntel,
           skills,
+          context_docs,
         },
       })
       .onConflictDoNothing();
+  }
+
+  /**
+   * T-B5 — Trigger a version bump when context docs change for an agent. Called
+   * by the ProjectContextService via the container facade (never direct module
+   * import).
+   *
+   * Reads the current agent row, bumps its version if context-doc set differs
+   * from the latest snapshot, and records the new snapshot.
+   */
+  async snapshotContextDocChange(agentId: string): Promise<void> {
+    const [row] = await this.db
+      .select()
+      .from(t.agents)
+      .where(eq(t.agents.id, agentId));
+    if (!row) return;
+
+    // Read current snapshot's context_docs.
+    const [latest] = await this.db
+      .select({ configJson: t.agentVersions.configJson })
+      .from(t.agentVersions)
+      .where(eq(t.agentVersions.agentId, agentId))
+      .orderBy(desc(t.agentVersions.version))
+      .limit(1);
+
+    const currentContextDocRows = await this.db
+      .select({ path: t.agentContextDocs.path })
+      .from(t.agentContextDocs)
+      .where(eq(t.agentContextDocs.agentId, agentId))
+      .orderBy(asc(t.agentContextDocs.order));
+    const currentPaths = currentContextDocRows.map((r) => r.path);
+
+    // Check whether context_docs changed vs the latest snapshot.
+    const latestConfig = latest?.configJson as { context_docs?: string[] } | undefined;
+    const snapshotPaths = latestConfig?.context_docs ?? [];
+    const changed =
+      snapshotPaths.length !== currentPaths.length ||
+      snapshotPaths.some((p, i) => p !== currentPaths[i]);
+
+    if (!changed) return;
+
+    const nextVersion = row.version + 1;
+    await this.db
+      .update(t.agents)
+      .set({ version: nextVersion })
+      .where(eq(t.agents.id, agentId));
+    // Re-read updated row for the snapshot.
+    const [updatedRow] = await this.db
+      .select()
+      .from(t.agents)
+      .where(eq(t.agents.id, agentId));
+    if (updatedRow) await this.snapshotVersion(updatedRow, nextVersion);
   }
 
   // ---- agent_versions (immutable config snapshots) ------------------------

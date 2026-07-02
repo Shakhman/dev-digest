@@ -2,6 +2,7 @@
 
 import React from "react";
 import type { SmartDiff, PrFile, ReviewRecord, FindingRecord } from "@devdigest/shared";
+import { useDiffSummary } from "@/lib/hooks/diffSummary";
 import { DEFAULT_EXPANDED } from "./constants";
 import { SmartDiffGroupSection } from "./SmartDiffGroupSection";
 import { s } from "./styles";
@@ -13,6 +14,8 @@ export interface SmartDiffViewerProps {
   onFindingClick: (findingId: string) => void;
   repoFullName: string | null;
   headSha: string | null;
+  /** Needed to fetch/generate the (opt-in, cached) per-file `pseudocode_summary`. */
+  prId: string | null;
 }
 
 export function SmartDiffViewer({
@@ -22,7 +25,27 @@ export function SmartDiffViewer({
   onFindingClick,
   repoFullName,
   headSha,
+  prId,
 }: SmartDiffViewerProps) {
+  const { summaryByPath, generate, generatingPath } = useDiffSummary(prId);
+
+  // Merge the fetched/generated summaries into the file rows client-side —
+  // `computeSmartDiff` (the server route this data came from) always emits
+  // `pseudocode_summary: null`; the row component's existing null-gate is the
+  // only thing that changes behavior once a summary is present here.
+  const mergedSmartDiff = React.useMemo<SmartDiff>(() => {
+    if (summaryByPath.size === 0) return smartDiff;
+    return {
+      ...smartDiff,
+      groups: smartDiff.groups.map((group) => ({
+        ...group,
+        files: group.files.map((file) => {
+          const summary = summaryByPath.get(file.path);
+          return summary != null ? { ...file, pseudocode_summary: summary } : file;
+        }),
+      })),
+    };
+  }, [smartDiff, summaryByPath]);
   // Build patch map from prFiles
   const filePatches = React.useMemo(() => {
     const map = new Map<string, string | null>();
@@ -71,6 +94,15 @@ export function SmartDiffViewer({
     [smartDiff],
   );
 
+  // Generation is now triggered per-file (see SmartDiffFileRow), not per-PR —
+  // fall back to a no-op when `prId` is unset (hook returns `generate: undefined`).
+  const handleGenerate = React.useCallback(
+    (path: string) => {
+      generate?.(path);
+    },
+    [generate],
+  );
+
   return (
     <div style={s.root}>
       <div style={s.viewerHeader}>
@@ -82,7 +114,7 @@ export function SmartDiffViewer({
         </span>
       </div>
 
-      {smartDiff.groups.map((group) => (
+      {mergedSmartDiff.groups.map((group) => (
         <SmartDiffGroupSection
           key={group.role}
           group={group}
@@ -92,6 +124,8 @@ export function SmartDiffViewer({
           onFindingClick={onFindingClick}
           repoFullName={repoFullName}
           headSha={headSha}
+          onGenerate={handleGenerate}
+          generatingPath={generatingPath}
         />
       ))}
     </div>

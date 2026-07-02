@@ -18,6 +18,7 @@ export const FeatureModelId = z.enum([
   'risk_brief',
   'conformance',
   'conventions',
+  'smart_diff_summary',
 ]);
 export type FeatureModelId = z.infer<typeof FeatureModelId>;
 
@@ -79,6 +80,16 @@ export const FEATURE_MODELS: FeatureModelDef[] = [
     // structured output. DeepSeek models don't reliably honor strict mode on
     // OpenRouter, so they fail parse-with-repair and throw "schema validation
     // failed". OpenAI models via OpenRouter support strict outputs.
+    defaultProvider: 'openrouter',
+    defaultModel: 'openai/gpt-4.1-mini',
+  },
+  {
+    id: 'smart_diff_summary',
+    label: 'Smart Diff · File Summaries',
+    description: 'Writes a one-line "what this file does" per changed file.',
+    // Same reasoning as `conventions`: OpenRouter (BYO key covers it) + an
+    // OpenAI-family model, since DeepSeek models don't reliably honor strict
+    // json_schema structured output on OpenRouter (see server/INSIGHTS.md).
     defaultProvider: 'openrouter',
     defaultModel: 'openai/gpt-4.1-mini',
   },
@@ -260,6 +271,14 @@ export const SpecFile = z.object({
   content: z.string().nullish(),
   size: z.number().int().nullish(),
   updated_at: z.string().nullish(),
+  /** Which configured root folder this file was found under (e.g. 'specs', 'docs', 'insights'). */
+  source: z.string().nullish(),
+  /** Approximate token count for this document (using the server-side tokenizer, AC-21). */
+  tokens: z.number().int().nullish(),
+  /** How many agents (in the workspace) have this document in their effective context (AC-24). */
+  used_by_agents: z.number().int().nullish(),
+  /** True when the stored path no longer exists in the clone (file deleted/renamed, AC-9). */
+  missing: z.boolean().default(false),
 });
 export type SpecFile = z.infer<typeof SpecFile>;
 

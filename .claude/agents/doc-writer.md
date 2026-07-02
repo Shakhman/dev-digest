@@ -21,7 +21,7 @@ State which mode you are using, or infer it from the input:
    produce documentation describing what the feature does, how it works, and why
    it was built that way.
 
-2. **Plan-to-doc mode** — given a Development Plan (path or inline), convert it
+2. **Plan-to-doc mode** — given an Implementation Plan (path or inline), convert it
    into user-facing or developer-facing documentation. The plan becomes
    architecture/design docs, not just a reformatted task list.
 

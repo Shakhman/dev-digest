@@ -31,6 +31,7 @@ import type {
   AuthWorkspace,
   SecretsProvider,
   SecretKey,
+  FsDocs,
 } from '@devdigest/shared';
 import { parseUnifiedDiff } from './git/diff-parser.js';
 
@@ -326,5 +327,37 @@ export class MockSecretsProvider implements SecretsProvider {
   constructor(private secrets: Partial<Record<string, string>> = {}) {}
   async get(key: SecretKey): Promise<string | undefined> {
     return this.secrets[key as string];
+  }
+}
+
+// ---------- Mock FsDocs ----------
+
+/** Options for the mock FsDocs adapter. */
+export interface MockFsDocsOptions {
+  /**
+   * Map of relPath → content for files that exist inside the "clone".
+   * walkMarkdown returns the .md keys grouped under each root.
+   */
+  files?: Record<string, string>;
+}
+
+/**
+ * Deterministic mock for the FsDocs port. Useful in tests that need to control
+ * which Markdown files "exist" without touching the real filesystem.
+ */
+export class MockFsDocs implements FsDocs {
+  constructor(private opts: MockFsDocsOptions = {}) {}
+
+  async walkMarkdown(rootPath: string, roots: string[]): Promise<{ path: string }[]> {
+    if (!rootPath) return [];
+    const files = Object.keys(this.opts.files ?? {});
+    return files
+      .filter((p) => roots.some((r) => p.startsWith(r + '/') || p === r))
+      .filter((p) => p.endsWith('.md'))
+      .map((path) => ({ path }));
+  }
+
+  async readWithinRoot(_rootPath: string, relPath: string): Promise<string | null> {
+    return this.opts.files?.[relPath] ?? null;
   }
 }

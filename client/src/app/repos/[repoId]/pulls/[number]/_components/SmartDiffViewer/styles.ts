@@ -174,6 +174,28 @@ export const s = {
     whiteSpace: "nowrap",
   } satisfies CSSProperties,
 
+  // Interactive per-file "generate summary" trigger (collapsed header row) —
+  // a small pill button, NOT a passive badge like `summaryBadge` above.
+  summaryButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+    fontSize: 11,
+    fontWeight: 600,
+    color: "var(--accent)",
+    background: "transparent",
+    border: "1px solid var(--accent)",
+    borderRadius: 10,
+    padding: "1px 7px",
+    flexShrink: 0,
+    cursor: "pointer",
+  } satisfies CSSProperties,
+
+  summaryButtonDisabled: {
+    opacity: 0.45,
+    cursor: "not-allowed",
+  } satisfies CSSProperties,
+
   fileStat: {
     fontSize: 11.5,
     fontFamily: "var(--font-mono, monospace)",
@@ -198,12 +220,23 @@ export const s = {
     color: "var(--text-secondary)",
     borderBottom: "1px solid var(--border)",
     fontStyle: "italic",
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
   } satisfies CSSProperties,
 
   pseudoLabel: {
     fontWeight: 600,
     fontStyle: "normal",
     color: "var(--text-muted)",
+  } satisfies CSSProperties,
+
+  // Wraps the sparkle icon + "What this does:" label so the icon centers
+  // against the label's cap-height rather than the text baseline.
+  pseudoLabelWrap: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
   } satisfies CSSProperties,
 
   patchPre: {

@@ -29,6 +29,12 @@ const EnvSchema = z.object({
   API_PORT: z.coerce.number().int().default(3001),
   WEB_PORT: z.coerce.number().int().default(3000),
   DEVDIGEST_CLONE_DIR: z.string().optional(),
+  /**
+   * Comma-separated root folder names to walk when discovering Project Context
+   * documents (AC-4). Example: "specs,docs,insights".
+   * Defaults to "specs,docs,insights" when unset.
+   */
+  DEVDIGEST_CONTEXT_ROOTS: z.string().optional(),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   // Treat an empty string (e.g. `LOG_LEVEL=` in .env) as unset so the
   // NODE_ENV-based fallback in loadConfig applies instead of failing validation.
@@ -60,6 +66,12 @@ export type AppConfig = {
    * EXACTLY like the ripgrep-only baseline.
    */
   repoIntelEnabled: boolean;
+  /**
+   * Root folder names to walk during Project Context document discovery (AC-4).
+   * Driven by DEVDIGEST_CONTEXT_ROOTS (comma-split); defaults to
+   * ['specs', 'docs', 'insights'] when unset.
+   */
+  contextRoots: string[];
 };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -78,5 +90,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     webOrigin: `http://localhost:${parsed.WEB_PORT}`,
     embeddingsEnabled: parsed.EMBEDDINGS_ENABLED === 'true',
     repoIntelEnabled: parsed.REPO_INTEL_ENABLED !== 'false',
+    contextRoots: parsed.DEVDIGEST_CONTEXT_ROOTS
+      ? parsed.DEVDIGEST_CONTEXT_ROOTS.split(',').map((r) => r.trim()).filter(Boolean)
+      : ['specs', 'docs', 'insights'],
   };
 }

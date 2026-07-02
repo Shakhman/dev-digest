@@ -46,3 +46,16 @@ export function githubBlobUrl(
   }
   return url;
 }
+
+/**
+ * Brief `risks[].file_refs` / `review_focus[]` entries are plain strings that
+ * may embed a trailing `:line` or `:start-end` (e.g. "src/config.ts:12" or
+ * "src/middleware/ratelimit.ts:12-18") — split that off so the line lands in
+ * `githubBlobUrl`'s `#L{start}[-L{end}]` anchor instead of being treated as
+ * (and URL-encoded into) part of the file path.
+ */
+export function parseFileRef(ref: string): { path: string; startLine?: number; endLine?: number } {
+  const m = /^(.+):(\d+)(?:-(\d+))?$/.exec(ref);
+  if (!m || !m[1] || !m[2]) return { path: ref };
+  return { path: m[1], startLine: Number(m[2]), endLine: m[3] ? Number(m[3]) : undefined };
+}

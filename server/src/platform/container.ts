@@ -6,6 +6,7 @@ import type {
   CodeIndex,
   Embedder,
   LLMProvider,
+  FsDocs,
 } from '@devdigest/shared';
 import type { AppConfig } from './config.js';
 import type { Db } from '../db/client.js';
@@ -30,6 +31,150 @@ import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
 import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.js';
+import { NodeFsDocs } from '../adapters/fs-docs/index.js';
+import { resolveOrder, admitToBudget } from '../modules/project-context/resolver.js';
+import { ProjectContextRepository } from '../modules/project-context/repository.js';
+
+/**
+ * Resolved result from the project-context facade (T-B6).
+ * Returned by `resolveAndRead(...)` for use in run-executor.
+ */
+export interface ProjectContextResult {
+  /** Ordered Markdown contents to pass as `specs` to reviewPullRequest. */
+  contents: string[];
+  /** Paths + token counts for embedded docs (for trace.specs_read). */
+  read: { path: string; tokens: number }[];
+  /** Paths that were attached but could not be read (missing/unreadable). */
+  omitted: string[];
+  /** Paths that were truncated to fit the budget. */
+  truncated: string[];
+}
+
+/**
+ * Container facade for project-context resolution + reading (T-B6).
+ * Wired in the composition root; tests inject a stub via ContainerOverrides.
+ */
+export interface ProjectContextFacade {
+  /**
+   * Resolve the effective doc set (agentPaths + skillGroups), read each from
+   * the clone root, trim to budget, return ordered contents + trace metadata.
+   */
+  resolveAndRead(params: {
+    agentPaths: { path: string; order: number }[];
+    skillGroups: { paths: { path: string; order: number }[] }[];
+    clonePath: string;
+    budget: number;
+  }): Promise<ProjectContextResult>;
+
+  /**
+   * Fetch an agent's own context-doc paths + the doc paths for each enabled
+   * skill (via `ProjectContextRepository` — never raw schema queries from
+   * callers like run-executor), then resolve + read + budget exactly like
+   * `resolveAndRead`. The single entry point run-executor should use.
+   */
+  resolveForRun(params: {
+    agentId: string;
+    enabledSkillIds: string[];
+    clonePath: string;
+    budget: number;
+  }): Promise<ProjectContextResult>;
+
+  /**
+   * Workspace-DEFAULT context resolution (SPEC-09 T-B2): the baseline
+   * discovered doc set under the clone's configured roots, trimmed to
+   * `budget` — applies NO agent/skill `context_docs` overrides. Used by
+   * features (the `brief` aggregator) that aren't tied to any particular
+   * agent/skill config, so they get the same baseline context regardless of
+   * workspace agent setup. Degrades to an empty result (never throws) when
+   * there is no clone / no docs / a filesystem error.
+   */
+  resolveWorkspaceDefault(params: { clonePath: string; budget: number }): Promise<ProjectContextResult>;
+}
+
+/** Build the default (non-injected) ProjectContextFacade implementation. */
+function buildProjectContextFacade(container: Container): ProjectContextFacade {
+  const repo = new ProjectContextRepository(container.db);
+
+  /**
+   * Read an ordered list of repo-relative doc paths from `clonePath`, count
+   * tokens, and admit them to `budget`. Shared by `resolveAndRead` (explicit
+   * agent/skill path lists) and `resolveWorkspaceDefault` (discovered
+   * baseline set, T-B2) so the read + budget behaviour stays identical.
+   */
+  async function readPathsWithinBudget(
+    orderedPaths: string[],
+    clonePath: string,
+    budget: number,
+  ): Promise<ProjectContextResult> {
+    const docs: { path: string; content: string; tokens: number }[] = [];
+    const omitted: string[] = [];
+
+    for (const p of orderedPaths) {
+      const content = await container.fsDocs.readWithinRoot(clonePath, p);
+      if (content === null) {
+        omitted.push(p);
+        continue;
+      }
+      const tokens = container.tokenizer.count(content);
+      docs.push({ path: p, content, tokens });
+    }
+
+    const { included, truncated, excluded } = admitToBudget({ docs, budget });
+
+    return {
+      contents: included.map((d) => d.content),
+      read: included.map((d) => ({ path: d.path, tokens: d.tokens })),
+      omitted,
+      truncated: [...truncated.map((d) => d.path), ...excluded.map((d) => d.path)],
+    };
+  }
+
+  async function resolveAndRead({
+    agentPaths,
+    skillGroups,
+    clonePath,
+    budget,
+  }: {
+    agentPaths: { path: string; order: number }[];
+    skillGroups: { paths: { path: string; order: number }[] }[];
+    clonePath: string;
+    budget: number;
+  }): Promise<ProjectContextResult> {
+    const orderedPaths = resolveOrder({ agentPaths, skillGroups });
+    return readPathsWithinBudget(orderedPaths, clonePath, budget);
+  }
+
+  const EMPTY_RESULT: ProjectContextResult = { contents: [], read: [], omitted: [], truncated: [] };
+
+  return {
+    resolveAndRead,
+
+    async resolveForRun({ agentId, enabledSkillIds, clonePath, budget }) {
+      const agentPaths = await repo.listAgentDocs(agentId);
+      const skillGroups: { paths: { path: string; order: number }[] }[] = [];
+      for (const skillId of enabledSkillIds) {
+        const paths = await repo.listSkillDocs(skillId);
+        skillGroups.push({ paths });
+      }
+      return resolveAndRead({ agentPaths, skillGroups, clonePath, budget });
+    },
+
+    async resolveWorkspaceDefault({ clonePath, budget }) {
+      try {
+        const roots = container.config.contextRoots;
+        const walked = await container.fsDocs.walkMarkdown(clonePath, roots);
+        if (walked.length === 0) return EMPTY_RESULT;
+
+        // Baseline order: discovery order (no agent/skill overrides to apply).
+        const orderedPaths = walked.map((w) => w.path);
+        return await readPathsWithinBudget(orderedPaths, clonePath, budget);
+      } catch {
+        // No clone / fs error — degrade to empty, never throw (Non-goal AC-14).
+        return EMPTY_RESULT;
+      }
+    },
+  };
+}
 
 /**
  * DI container. One per app instance. Holds config, db, the JobRunner,
@@ -52,6 +197,10 @@ export interface ContainerOverrides {
   /** repo-intel T3 adapters — only the indexer pipeline reads these. */
   depgraph?: DepGraph;
   tokenizer?: Tokenizer;
+  /** Clone-root-confined Markdown filesystem (project context, T-B1). */
+  fsDocs?: FsDocs;
+  /** Project context facade (T-B6) — tests inject a stub. */
+  projectContext?: ProjectContextFacade;
 }
 
 export class Container {
@@ -78,6 +227,8 @@ export class Container {
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
   private _priceBook?: PriceBook;
+  private _fsDocs?: FsDocs;
+  private _projectContext?: ProjectContextFacade;
 
   constructor(config: AppConfig, db: Db, private overrides: ContainerOverrides = {}) {
     this.config = config;
@@ -135,6 +286,20 @@ export class Container {
     if (this.overrides.tokenizer) return this.overrides.tokenizer;
     this._tokenizer ??= new TiktokenTokenizer();
     return this._tokenizer;
+  }
+
+  /** Clone-root-confined Markdown filesystem adapter (T-B1). */
+  get fsDocs(): FsDocs {
+    if (this.overrides.fsDocs) return this.overrides.fsDocs;
+    this._fsDocs ??= new NodeFsDocs();
+    return this._fsDocs;
+  }
+
+  /** Project context facade — resolves + reads doc sets for run-executor (T-B6). */
+  get projectContext(): ProjectContextFacade {
+    if (this.overrides.projectContext) return this.overrides.projectContext;
+    this._projectContext ??= buildProjectContextFacade(this);
+    return this._projectContext;
   }
 
   /**
